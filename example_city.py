@@ -16,6 +16,7 @@ color_white = vec3(1.0, 1.0, 1.0)  # A pure white color
 color_path = vec3(0.8, 0.6, 0.2)  # A yellowish-brown color for the dirt path
 color_trunk = vec3(0.5, 0.3, 0.1)  # A lighter brown color for the tree trunk
 color_leaves = vec3(0.2, 0.8, 0.2)  # A light green color for the leaves
+color_white = vec3(1.0, 1.0, 1.0)  # A pure white color
 
 debug_position = ivec3(20, 0, 20)
 
@@ -33,40 +34,9 @@ def make_grass_block(x, y, z):
 
 @ti.func
 def make_river_block(x, y, z):
+    create_block(voxel_grid[x, y, z], ivec3(3, 3, 3), color_white, vec3(0.0), 0) 
     create_block(voxel_grid[x, y, z], ivec3(3, 2, 3), color_water, vec3(0.0)) 
      
-@ti.func
-def make_river_corner_block(x, y, z, direction):
-    create_block(voxel_grid[x, y, z], ivec3(3, 2, 3), color_water, vec3(0.0))
-    if direction == 1:  
-        # Top-left corner
-        # G R R
-        # R R R
-        # R R R
-        scene.set_voxel(voxel_grid[x, y, z] + ivec3(0, 2, 0), 1, color_grass)
-        create_block(voxel_grid[x, y, z] + ivec3(0, 0, 0), ivec3(1, 2, 1), color_dirt, vec3(0.0))
-    elif direction == 2:  
-        # Top-right corner
-        # R R G
-        # R R R
-        # R R R
-        scene.set_voxel(voxel_grid[x, y, z] + ivec3(2, 2, 0), 1, color_grass)
-        create_block(voxel_grid[x, y, z] + ivec3(2, 0, 0), ivec3(1, 2, 1), color_dirt, vec3(0.0))
-    elif direction == 3:  
-        # Bottom-left corner
-        # R R R
-        # R R R
-        # G R R
-        scene.set_voxel(voxel_grid[x, y, z] + ivec3(0, 2, 2), 1, color_grass)
-        create_block(voxel_grid[x, y, z] + ivec3(0, 0, 2), ivec3(1, 2, 1), color_dirt, vec3(0.0))
-    elif direction == 4:  
-        # Bottom-right corner
-        # R R R
-        # R R R
-        # R R G
-        scene.set_voxel(voxel_grid[x, y, z] + ivec3(2, 2, 2), 1, color_grass)
-        create_block(voxel_grid[x, y, z] + ivec3(2, 0, 2), ivec3(1, 2, 1), color_dirt, vec3(0.0))
-  
 @ti.func
 def make_straight_path_block(x, y, z, direction):
     create_block(voxel_grid[x, y, z], ivec3(3, 3, 3), color_grass, vec3(0.1)) 
@@ -131,25 +101,35 @@ def make_tree_top(x, y, z):
 
 @ti.func 
 def create_block(pos, size, color, color_noise, brightness=1):
+    # disable random for now
     for I in ti.grouped(
         ti.ndrange((pos[0], pos[0] + size[0]),
                    (pos[1], pos[1] + size[1]),
                    (pos[2], pos[2] + size[2]))):
         noise = ti.select(color_noise != vec3(0.0), color_noise * ti.random(), vec3(0.0))
-        scene.set_voxel(I, brightness, color + noise)
+        scene.set_voxel(I, brightness, color+noise)  
 
 @ti.kernel
 def initialize_voxels():
     initgrid()
-    make_grass_block(0, 0, 0)
-    make_river_block(1, 0, 0)
-    make_river_corner_block(2, 0, 0, 1)
-    make_straight_path_block(3, 0, 0, 1)
-    make_crosssection_path_block(4, 0, 0)
-    make_corner_path_block(5, 0, 0, 1)
-    make_treetrunk_block(6, 0, 0)
-    make_leaf_block(7, 0, 0)
-    make_tree_top(8, 0, 0)
+    for x, z in ti.ndrange((-10, 11), (-10, 11)):
+        if z == -10 or z == 10 or x == -10 or x == 10:
+            make_river_block(x + 21, 0, z + 21)
+            make_river_block(x + 19, 0, z + 21)  
+        make_grass_block(x + 20, 0, z + 20)
+        if (x != 0 and z != 0) and ti.random() < 0.1:  
+            tree_height = ti.random(ti.i32) % 3 + 2  
+            for h in range(tree_height):
+                make_treetrunk_block(x + 20, h, z + 20)
+                make_tree_top(x + 20, tree_height, z + 20)
+        
+        if x == 0 and z == 0:
+            make_crosssection_path_block(x + 20, 0, z + 20)
+        elif x == 0 or z == 0:
+            make_straight_path_block(x + 20, 0, z + 20, 1 if z == 0 else 2)
+
+
+
 
 
 
