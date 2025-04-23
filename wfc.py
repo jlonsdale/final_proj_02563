@@ -7,10 +7,10 @@ class Block:
     def __init__(self, name, recipe_func, allowed_neighbors=None):
         self.name = name
         self.recipe_func = recipe_func  # Function to build this block in the scene
+        # allowed_neighbors: dict of (dx, dy) -> list of allowed block names
         self.allowed_neighbors = allowed_neighbors or {}
 
     def build(self, scene, pos):
-        # Call the kernel function directly with scene, x, y, z, color
         self.recipe_func(scene, pos[0], pos[1], pos[2])
 
 # --- WFC 3D class (MVP: 2D layer) ---
@@ -19,6 +19,7 @@ class WaveFunctionCollapse3D:
         self.width = width
         self.height = height
         self.block_types = block_types  # List of Block objects
+        self.block_types_by_name = {b.name: b for b in block_types}
         self.grid = np.full((width, height), None)  # Collapsed block at each cell
         self.possible_blocks = [[set(block_types) for _ in range(height)] for _ in range(width)]
 
@@ -39,9 +40,12 @@ class WaveFunctionCollapse3D:
         for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
             nx, ny = x+dx, y+dy
             if 0 <= nx < self.width and 0 <= ny < self.height and self.grid[nx, ny] is None:
-                allowed = chosen_block.allowed_neighbors.get((dx, dy), None)
-                if allowed is not None:
-                    self.possible_blocks[nx][ny] = self.possible_blocks[nx][ny].intersection(allowed)
+                allowed_names = chosen_block.allowed_neighbors.get((dx, dy), None)
+                if allowed_names is not None:
+                    # Only keep blocks whose name is in allowed_names
+                    self.possible_blocks[nx][ny] = set(
+                        b for b in self.possible_blocks[nx][ny] if b.name in allowed_names
+                    )
 
     def build_scene(self, scene):
         for x in range(self.width):

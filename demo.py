@@ -147,17 +147,21 @@ scene.set_background_color((0.5, 0.5, 0.4))
 scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
 
 # --- Block types ---
+grass_allowed = {(-1,0): ['grass','dirt'], (1,0): ['grass','dirt'], (0,-1): ['grass','dirt'], (0,1): ['grass','dirt']}
+dirt_allowed = {(-1,0): ['grass','dirt','water'], (1,0): ['grass','dirt','water'], (0,-1): ['grass','dirt','water'], (0,1): ['grass','dirt','water']}
+water_allowed = {(-1,0): ['water','dirt'], (1,0): ['water','dirt'], (0,-1): ['water','dirt'], (0,1): ['water','dirt']}
+
 block_types = [
-    Block('grass', build_grass_block),
-    Block('dirt', build_dirt_block),
-    Block('water', build_water_block),
-    Block('path_x', build_path_block_x),
-    Block('path_z', build_path_block_z),
-    Block('path_cross', build_path_block_cross),
-    Block('path_corner1', build_path_block_corner1),
-    Block('path_corner2', build_path_block_corner2),
-    Block('path_corner3', build_path_block_corner3),
-    Block('path_corner4', build_path_block_corner4),
+    Block('grass', build_grass_block, allowed_neighbors=grass_allowed),
+    Block('dirt', build_dirt_block, allowed_neighbors=dirt_allowed),
+    Block('water', build_water_block, allowed_neighbors=water_allowed),
+    # Block('path_x', build_path_block_x),
+    # Block('path_z', build_path_block_z),
+    # Block('path_cross', build_path_block_cross),
+    # Block('path_corner1', build_path_block_corner1),
+    # Block('path_corner2', build_path_block_corner2),
+    # Block('path_corner3', build_path_block_corner3),
+    # Block('path_corner4', build_path_block_corner4),
 ]
 
 # --- Run WFC and build scene ---
