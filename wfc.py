@@ -4,15 +4,14 @@ from taichi.math import vec3, ivec3
 
 # --- Block class ---
 class Block:
-    def __init__(self, name, color, recipe_func, allowed_neighbors=None):
+    def __init__(self, name, recipe_func, allowed_neighbors=None):
         self.name = name
-        self.color = color
         self.recipe_func = recipe_func  # Function to build this block in the scene
         self.allowed_neighbors = allowed_neighbors or {}
 
     def build(self, scene, pos):
         # Call the kernel function directly with scene, x, y, z, color
-        self.recipe_func(scene, pos[0], pos[1], pos[2], self.color)
+        self.recipe_func(scene, pos[0], pos[1], pos[2])
 
 # --- WFC 3D class (MVP: 2D layer) ---
 class WaveFunctionCollapse3D:
