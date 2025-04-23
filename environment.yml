@@ -1,0 +1,9 @@
+name: final_proj_02563
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - numpy
+  - pip
+  - pip:
+    - taichi
