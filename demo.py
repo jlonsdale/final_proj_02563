@@ -25,7 +25,7 @@ def build_water_block(scene: ti.template(), x: int, y: int, z: int):
     for dx, dy, dz in ti.ndrange(3, 2, 3):
         scene.set_voxel((x*3+dx, y*3+dy, z*3+dz), 1, color_water)
     for dx, dz in ti.ndrange(3, 3):
-        scene.set_voxel((x*3+dx, y*3+2, z*3+dz), 1, color_white)
+        scene.set_voxel((x*3+dx, y*3+2, z*3+dz), 0, color_white)
 
 @ti.kernel
 def build_path_block_x(scene: ti.template(), x: int, y: int, z: int):
