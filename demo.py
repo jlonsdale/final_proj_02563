@@ -147,21 +147,78 @@ scene.set_background_color((0.5, 0.5, 0.4))
 scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
 
 # --- Block types ---
-grass_allowed = {(-1,0): ['grass','dirt'], (1,0): ['grass','dirt'], (0,-1): ['grass','dirt'], (0,1): ['grass','dirt']}
-dirt_allowed = {(-1,0): ['grass','dirt','water'], (1,0): ['grass','dirt','water'], (0,-1): ['grass','dirt','water'], (0,1): ['grass','dirt','water']}
-water_allowed = {(-1,0): ['water','dirt'], (1,0): ['water','dirt'], (0,-1): ['water','dirt'], (0,1): ['water','dirt']}
+grass_allowed = {
+    (-1,0): ['grass','dirt'],
+    (1,0): ['grass','dirt'],
+    (0,-1): ['grass','dirt'],
+    (0,1): ['grass','dirt']
+}
+dirt_allowed = {
+    (-1,0): ['grass','dirt','water','path_x','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (1,0):  ['grass','dirt','water','path_x','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (0,-1): ['grass','dirt','water','path_x','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (0,1):  ['grass','dirt','water','path_x','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4']
+}
+water_allowed = {
+    (-1,0): ['water','dirt'],
+    (1,0): ['water','dirt'],
+    (0,-1): ['water','dirt'],
+    (0,1): ['water','dirt']
+}
+path_x_allowed = {
+    (-1,0): ['path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4','dirt'],
+    (1,0):  ['path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4','dirt'],
+    (0,-1): ['path_x','dirt','grass','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (0,1):  ['path_x','dirt','grass','path_corner1','path_corner2','path_corner3','path_corner4']
+}
+path_z_allowed = {
+    (-1,0): ['path_z','dirt','grass','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (1,0):  ['path_z','dirt','grass','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (0,-1): ['path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4','dirt'],
+    (0,1):  ['path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4','dirt']
+}
+path_cross_allowed = {
+    (-1,0): ['path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (1,0):  ['path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (0,-1): ['path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (0,1):  ['path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4']
+}
+path_corner1_allowed = {
+    (-1,0): ['path_x','path_cross'],
+    (1,0):  ['dirt','grass','path_z','path_corner2','path_corner3','path_corner4'],
+    (0,-1): ['path_z','path_cross','path_corner2','path_corner3','path_corner4'],
+    (0,1):  ['dirt','grass','path_x']
+}
+path_corner2_allowed = {
+    (-1,0): ['path_x','path_cross','path_corner2','dirt','grass'],
+    (1,0):  ['dirt','grass','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (0,-1): ['path_z','path_cross','path_corner2','dirt','grass'],
+    (0,1):  ['dirt','grass','path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4']
+}
+path_corner3_allowed = {
+    (-1,0): ['dirt','grass','path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (1,0):  ['path_x','path_cross','path_corner3','dirt','grass'],
+    (0,-1): ['path_z','path_cross','path_corner3','dirt','grass'],
+    (0,1):  ['dirt','grass','path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4']
+}
+path_corner4_allowed = {
+    (-1,0): ['dirt','grass','path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (1,0):  ['path_x','path_cross','path_corner4','dirt','grass'],
+    (0,-1): ['dirt','grass','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
+    (0,1):  ['path_z','path_cross','path_corner4','dirt','grass']
+}
 
 block_types = [
-    Block('grass', build_grass_block, allowed_neighbors=grass_allowed),
-    Block('dirt', build_dirt_block, allowed_neighbors=dirt_allowed),
-    Block('water', build_water_block, allowed_neighbors=water_allowed),
-    # Block('path_x', build_path_block_x),
-    # Block('path_z', build_path_block_z),
-    # Block('path_cross', build_path_block_cross),
-    # Block('path_corner1', build_path_block_corner1),
-    # Block('path_corner2', build_path_block_corner2),
-    # Block('path_corner3', build_path_block_corner3),
-    # Block('path_corner4', build_path_block_corner4),
+    # Block('grass', build_grass_block, allowed_neighbors=grass_allowed),
+    # Block('dirt', build_dirt_block, allowed_neighbors=dirt_allowed),
+    # Block('water', build_water_block, allowed_neighbors=water_allowed),
+    Block('path_x', build_path_block_x, allowed_neighbors=path_x_allowed),
+    Block('path_z', build_path_block_z, allowed_neighbors=path_z_allowed),
+    Block('path_cross', build_path_block_cross, allowed_neighbors=path_cross_allowed),
+    Block('path_corner1', build_path_block_corner1, allowed_neighbors=path_corner1_allowed),
+    # Block('path_corner2', build_path_block_corner2, allowed_neighbors=path_corner2_allowed),
+    # Block('path_corner3', build_path_block_corner3, allowed_neighbors=path_corner3_allowed),
+    # Block('path_corner4', build_path_block_corner4, allowed_neighbors=path_corner4_allowed),
 ]
 
 # --- Run WFC and build scene ---
