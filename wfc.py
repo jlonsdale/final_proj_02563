@@ -21,7 +21,8 @@ class WaveFunctionCollapse3D:
         self.block_types = block_types  # List of Block objects
         self.block_types_by_name = {b.name: b for b in block_types}
         self.grid = np.full((width, height), None)  # Collapsed block at each cell
-        self.possible_blocks = [[set(block_types) for _ in range(height)] for _ in range(width)]
+        # Store sets of block names instead of Block objects
+        self.possible_blocks = [[set(self.block_types_by_name.keys()) for _ in range(height)] for _ in range(width)]
 
     def collapse(self):
         # MVP: Randomly pick a cell with lowest entropy and collapse
@@ -30,22 +31,29 @@ class WaveFunctionCollapse3D:
                 if self.grid[x, y] is None:
                     options = self.possible_blocks[x][y]
                     if options:
-                        chosen = np.random.choice(list(options))
+                        chosen_name = np.random.choice(list(options))
+                        chosen = self.block_types_by_name[chosen_name]
                         self.grid[x, y] = chosen
-                        self.propagate(x, y, chosen)
+                        self.propagate(x, y, chosen_name)
         # (This is a naive MVP, not a full WFC implementation)
 
-    def propagate(self, x, y, chosen_block):
-        # MVP: Remove incompatible blocks from neighbors
-        for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
-            nx, ny = x+dx, y+dy
-            if 0 <= nx < self.width and 0 <= ny < self.height and self.grid[nx, ny] is None:
-                allowed_names = chosen_block.allowed_neighbors.get((dx, dy), None)
-                if allowed_names is not None:
-                    # Only keep blocks whose name is in allowed_names
-                    self.possible_blocks[nx][ny] = set(
-                        b for b in self.possible_blocks[nx][ny] if b.name in allowed_names
-                    )
+    def propagate(self, x, y, chosen_name):
+        # Stack-based propagation: propagate constraints until no more changes
+        stack = [(x, y)]
+        while stack:
+            cx, cy = stack.pop()
+           
+            for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+                nx, ny = cx+dx, cy+dy
+                if 0 <= nx < self.width and 0 <= ny < self.height and self.grid[nx, ny] is None:
+                    allowed_names = set(self.block_types_by_name[chosen_name].allowed_neighbors.get((dx, dy), []))
+                    
+                    if allowed_names:
+                        before = set(self.possible_blocks[nx][ny])
+                        self.possible_blocks[nx][ny] = self.possible_blocks[nx][ny].intersection(allowed_names)
+                        after = self.possible_blocks[nx][ny]
+                        if len(after) < len(before):
+                            stack.append((nx, ny))
 
     def build_scene(self, scene):
         for x in range(self.width):
