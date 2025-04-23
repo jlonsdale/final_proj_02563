@@ -34,10 +34,11 @@ class WaveFunctionCollapse3D:
                         chosen_name = np.random.choice(list(options))
                         chosen = self.block_types_by_name[chosen_name]
                         self.grid[x, y] = chosen
-                        self.propagate(x, y, chosen_name)
+                        self.possible_blocks[x][y] = {chosen_name}
+                        self.propagate(x, y)
         # (This is a naive MVP, not a full WFC implementation)
 
-    def propagate(self, x, y, chosen_name):
+    def propagate(self, x, y):
         # Stack-based propagation: propagate constraints until no more changes
         stack = [(x, y)]
         while stack:
@@ -46,7 +47,9 @@ class WaveFunctionCollapse3D:
             for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
                 nx, ny = cx+dx, cy+dy
                 if 0 <= nx < self.width and 0 <= ny < self.height and self.grid[nx, ny] is None:
-                    allowed_names = set(self.block_types_by_name[chosen_name].allowed_neighbors.get((dx, dy), []))
+                    allowed_names = set()
+                    for block_name in self.possible_blocks[cx][cy]:
+                        allowed_names |= set(self.block_types_by_name[block_name].allowed_neighbors.get((dx, dy), []))
                     
                     if allowed_names:
                         before = set(self.possible_blocks[nx][ny])
