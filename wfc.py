@@ -52,7 +52,7 @@ class WaveFunctionCollapse3D:
                         allowed_names |= set(self.block_types_by_name[block_name].allowed_neighbors.get((dx, dy), []))
                     
                     if allowed_names:
-                        before = set(self.possible_blocks[nx][ny])
+                        before = self.possible_blocks[nx][ny]
                         self.possible_blocks[nx][ny] = self.possible_blocks[nx][ny].intersection(allowed_names)
                         after = self.possible_blocks[nx][ny]
                         if len(after) < len(before):
