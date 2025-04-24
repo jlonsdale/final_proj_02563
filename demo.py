@@ -170,23 +170,23 @@ def infer_allowed_neighbors(blocks, allowed_partial, directions=[(1,0),(0,1)]):
     return {k: {dir: list(v) for dir, v in d.items()} for k, d in full.items()}
 
 # Example usage for path blocks:
-path_blocks = ['path_x', 'path_z', 'path_cross', 'path_corner1']
+path_blocks = ['path_x', 'path_z', 'path_cross','path_corner1']
 allowed_partial = {
     'path_x': {
         (1,0): ['path_x','path_cross','path_corner1'],
-        (0,1): ['path_x','path_cross','path_corner1']
+        (0,1): ['path_x']
     },
     'path_z': {
-        (1,0): ['path_z','path_cross','path_corner1'],
-        (0,1): ['path_z','path_cross','path_corner1']
+        (1,0): ['path_z'],
+        (0,1): ['path_z','path_cross']
     },
     'path_cross': {
-        (1,0): ['path_x','path_cross','path_corner1','path_z'],
-        (0,1): ['path_z','path_cross','path_corner1','path_x']
+        (1,0): ['path_x','path_cross','path_corner1'],
+        (0,1): ['path_z','path_cross']
     },
     'path_corner1': {
-        (1,0): ['path_z','path_cross','path_corner1'],
-        (0,1): ['path_x','path_cross','path_corner1']
+        (1,0): ['path_z',],
+        (0,1): ['path_z', 'path_cross']
     }
 }
 
@@ -199,6 +199,6 @@ block_types = [
 
 # --- Run WFC and build scene ---
 wfc = WaveFunctionCollapse3D(10, 10, block_types)
-wfc.collapse()
+wfc.collapse(seed=42)  # Seed for reproducibility
 wfc.build_scene(scene)
 scene.finish()
