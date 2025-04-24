@@ -148,7 +148,6 @@ class Renderer:
 
         bbox_min = self.bbox[0]
         bbox_max = self.bbox[1]
-
         inter, near, far = ray_aabb_intersection(bbox_min, bbox_max, eye_pos,
                                                  d)
         hit_distance = inf

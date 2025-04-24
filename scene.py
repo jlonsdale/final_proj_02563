@@ -109,7 +109,7 @@ class Camera:
             return np.array([-1.0, 0.0, 0.0])
         return np.cross(self._up, tgtdir)
 
-@ti.data_oriented
+
 class Scene:
     def __init__(self, voxel_edges=0.06, exposure=3):
         ti.init(arch=ti.vulkan)
@@ -156,17 +156,6 @@ class Scene:
     def set_background_color(self, color):
         self.renderer.background_color[None] = color
 
-    def update_window(self):
-        self.renderer.recompute_bbox()
-        self.renderer.reset_framebuffer()
-        self.renderer.set_camera_pos(*self.camera.position)
-        self.renderer.set_look_at(*self.camera.look_at)
-
-    @ti.kernel
-    def fill_voxels_with_color(self, size: ti.i32, mat: ti.i32, color: ti.types.vector(3, ti.f32)):
-        for x, y, z in ti.ndrange(size, size, size):
-            self.set_voxel((x, y, z), mat, color)
-
     def finish(self):
         self.renderer.recompute_bbox()
         canvas = self.window.get_canvas()
@@ -189,11 +178,11 @@ class Scene:
             img = self.renderer.fetch_image()
             if self.window.is_pressed('p'):
                 timestamp = datetime.today().strftime('%Y-%m-%d-%H%M%S')
-            if self.window.is_pressed('x'):
-                self.fill_voxels_with_color(10, MAT_LAMBERTIAN, (1.0, 1.0, 0.0))
-                self.renderer.recompute_bbox()
-                self.renderer.reset_framebuffer()
-                             
+                dirpath = os.getcwd()
+                main_filename = os.path.split(__main__.__file__)[1]
+                fname = os.path.join(dirpath, 'screenshot', f"{main_filename}-{timestamp}.jpg")
+                ti.tools.image.imwrite(img, fname)
+                print(f"Screenshot has been saved to {fname}")
             canvas.set_image(img)
             elapsed_time = time.time() - t
             if elapsed_time * TARGET_FPS > 1:
