@@ -199,6 +199,6 @@ block_types = [
 
 # --- Run WFC and build scene ---
 wfc = WaveFunctionCollapse3D(10, 10, block_types)
-wfc.collapse(seed=42)  # Seed for reproducibility
+wfc.collapse()  # Seed for reproducibility
 wfc.build_scene(scene)
 scene.finish()
