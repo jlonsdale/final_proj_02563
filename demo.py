@@ -28,7 +28,7 @@ def build_water_block(scene: ti.template(), x: int, y: int, z: int):
         scene.set_voxel((x*3+dx, y*3+2, z*3+dz), 0, color_white)
 
 @ti.kernel
-def build_path_block_x(scene: ti.template(), x: int, y: int, z: int):
+def build_path_x(scene: ti.template(), x: int, y: int, z: int):
     color_grass = vec3(0.03, 0.45, 0.03)
     color_dirt = vec3(0.45, 0.17, 0.05)
     color_path = vec3(0.8, 0.6, 0.2)
@@ -43,7 +43,7 @@ def build_path_block_x(scene: ti.template(), x: int, y: int, z: int):
         scene.set_voxel((x*3+dx, y*3+dy, z*3+dz), 1, color_dirt)
 
 @ti.kernel
-def build_path_block_z(scene: ti.template(), x: int, y: int, z: int):
+def build_path_z(scene: ti.template(), x: int, y: int, z: int):
     color_grass = vec3(0.03, 0.45, 0.03)
     color_dirt = vec3(0.45, 0.17, 0.05)
     color_path = vec3(0.8, 0.6, 0.2)
@@ -58,7 +58,7 @@ def build_path_block_z(scene: ti.template(), x: int, y: int, z: int):
         scene.set_voxel((x*3+dx, y*3+dy, z*3+dz), 1, color_dirt)
 
 @ti.kernel
-def build_path_block_cross(scene: ti.template(), x: int, y: int, z: int):
+def build_path_cross(scene: ti.template(), x: int, y: int, z: int):
     color_grass = vec3(0.03, 0.45, 0.03)
     color_dirt = vec3(0.45, 0.17, 0.05)
     color_path = vec3(0.8, 0.6, 0.2)
@@ -75,7 +75,7 @@ def build_path_block_cross(scene: ti.template(), x: int, y: int, z: int):
         scene.set_voxel((x*3+dx, y*3+dy, z*3+dz), 1, color_dirt)
 
 @ti.kernel
-def build_path_block_corner1(scene: ti.template(), x: int, y: int, z: int):
+def build_path_corner1(scene: ti.template(), x: int, y: int, z: int):
     color_grass = vec3(0.03, 0.45, 0.03)
     color_dirt = vec3(0.45, 0.17, 0.05)
     color_path = vec3(0.8, 0.6, 0.2)
@@ -91,7 +91,7 @@ def build_path_block_corner1(scene: ti.template(), x: int, y: int, z: int):
         scene.set_voxel((x*3+dx, y*3+dy, z*3+dz), 1, color_dirt)
 
 @ti.kernel
-def build_path_block_corner2(scene: ti.template(), x: int, y: int, z: int):
+def build_path_corner2(scene: ti.template(), x: int, y: int, z: int):
     color_grass = vec3(0.03, 0.45, 0.03)
     color_dirt = vec3(0.45, 0.17, 0.05)
     color_path = vec3(0.8, 0.6, 0.2)
@@ -107,7 +107,7 @@ def build_path_block_corner2(scene: ti.template(), x: int, y: int, z: int):
         scene.set_voxel((x*3+dx, y*3+dy, z*3+dz), 1, color_dirt)
 
 @ti.kernel
-def build_path_block_corner3(scene: ti.template(), x: int, y: int, z: int):
+def build_path_corner3(scene: ti.template(), x: int, y: int, z: int):
     color_grass = vec3(0.03, 0.45, 0.03)
     color_dirt = vec3(0.45, 0.17, 0.05)
     color_path = vec3(0.8, 0.6, 0.2)
@@ -123,7 +123,7 @@ def build_path_block_corner3(scene: ti.template(), x: int, y: int, z: int):
         scene.set_voxel((x*3+dx, y*3+dy, z*3+dz), 1, color_dirt)
 
 @ti.kernel
-def build_path_block_corner4(scene: ti.template(), x: int, y: int, z: int):
+def build_path_corner4(scene: ti.template(), x: int, y: int, z: int):
     color_grass = vec3(0.03, 0.45, 0.03)
     color_dirt = vec3(0.45, 0.17, 0.05)
     color_path = vec3(0.8, 0.6, 0.2)
@@ -147,78 +147,54 @@ scene.set_background_color((0.5, 0.5, 0.4))
 scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
 
 # --- Block types ---
-grass_allowed = {
-    (-1,0): ['grass','dirt'],
-    (1,0): ['grass','dirt'],
-    (0,-1): ['grass','dirt'],
-    (0,1): ['grass','dirt']
-}
-dirt_allowed = {
-    (-1,0): ['grass','dirt','water','path_x','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (1,0):  ['grass','dirt','water','path_x','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (0,-1): ['grass','dirt','water','path_x','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (0,1):  ['grass','dirt','water','path_x','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4']
-}
-water_allowed = {
-    (-1,0): ['water','dirt'],
-    (1,0): ['water','dirt'],
-    (0,-1): ['water','dirt'],
-    (0,1): ['water','dirt']
-}
-path_x_allowed = {
-    (-1,0): ['path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4','dirt'],
-    (1,0):  ['path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4','dirt'],
-    (0,-1): ['path_x','dirt','grass','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (0,1):  ['path_x','dirt','grass','path_corner1','path_corner2','path_corner3','path_corner4']
-}
-path_z_allowed = {
-    (-1,0): ['path_z','dirt','grass','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (1,0):  ['path_z','dirt','grass','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (0,-1): ['path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4','dirt'],
-    (0,1):  ['path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4','dirt']
-}
-path_cross_allowed = {
-    (-1,0): ['path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (1,0):  ['path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (0,-1): ['path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (0,1):  ['path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4']
-}
-path_corner1_allowed = {
-    (-1,0): ['path_x','path_cross'],
-    (1,0):  ['dirt','grass','path_z','path_corner2','path_corner3','path_corner4'],
-    (0,-1): ['path_z','path_cross','path_corner2','path_corner3','path_corner4'],
-    (0,1):  ['dirt','grass','path_x']
-}
-path_corner2_allowed = {
-    (-1,0): ['path_x','path_cross','path_corner2','dirt','grass'],
-    (1,0):  ['dirt','grass','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (0,-1): ['path_z','path_cross','path_corner2','dirt','grass'],
-    (0,1):  ['dirt','grass','path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4']
-}
-path_corner3_allowed = {
-    (-1,0): ['dirt','grass','path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (1,0):  ['path_x','path_cross','path_corner3','dirt','grass'],
-    (0,-1): ['path_z','path_cross','path_corner3','dirt','grass'],
-    (0,1):  ['dirt','grass','path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4']
-}
-path_corner4_allowed = {
-    (-1,0): ['dirt','grass','path_x','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (1,0):  ['path_x','path_cross','path_corner4','dirt','grass'],
-    (0,-1): ['dirt','grass','path_z','path_cross','path_corner1','path_corner2','path_corner3','path_corner4'],
-    (0,1):  ['path_z','path_cross','path_corner4','dirt','grass']
+
+def infer_allowed_neighbors(blocks, allowed_partial, directions=[(1,0),(0,1)]):
+    """
+    Given a dict of allowed_neighbors for (1,0) and (0,1), infer (-1,0) and (0,-1).
+    Returns a new dict with all four directions.
+    """
+    # Start with a copy of the partial dict, using sets for easy updating
+    full = {k: {d: set(v) for d, v in dct.items()} for k, dct in allowed_partial.items()}
+    # Add missing directions
+    for block in blocks:
+        for d, axis in [((1,0), (-1,0)), ((0,1), (0,-1))]:
+            allowed = set()
+            for other, other_dict in allowed_partial.items():
+                if block in other_dict.get(d, []):
+                    allowed.add(other)
+            if axis in full[block]:
+                full[block][axis].update(allowed)
+            else:
+                full[block][axis] = allowed
+    # Convert sets back to lists
+    return {k: {dir: list(v) for dir, v in d.items()} for k, d in full.items()}
+
+# Example usage for path blocks:
+path_blocks = ['path_x', 'path_z', 'path_cross', 'path_corner1']
+allowed_partial = {
+    'path_x': {
+        (1,0): ['path_x','path_cross','path_corner1'],
+        (0,1): ['path_x','path_cross','path_corner1']
+    },
+    'path_z': {
+        (1,0): ['path_z','path_cross','path_corner1'],
+        (0,1): ['path_z','path_cross','path_corner1']
+    },
+    'path_cross': {
+        (1,0): ['path_x','path_cross','path_corner1','path_z'],
+        (0,1): ['path_z','path_cross','path_corner1','path_x']
+    },
+    'path_corner1': {
+        (1,0): ['path_z','path_cross','path_corner1'],
+        (0,1): ['path_x','path_cross','path_corner1']
+    }
 }
 
+allowed_neighbors = infer_allowed_neighbors(path_blocks, allowed_partial)
+
 block_types = [
-    # Block('grass', build_grass_block, allowed_neighbors=grass_allowed),
-    # Block('dirt', build_dirt_block, allowed_neighbors=dirt_allowed),
-    # Block('water', build_water_block, allowed_neighbors=water_allowed),
-    Block('path_x', build_path_block_x, allowed_neighbors=path_x_allowed),
-    Block('path_z', build_path_block_z, allowed_neighbors=path_z_allowed),
-    Block('path_cross', build_path_block_cross, allowed_neighbors=path_cross_allowed),
-    # Block('path_corner1', build_path_block_corner1, allowed_neighbors=path_corner1_allowed),
-    # Block('path_corner2', build_path_block_corner2, allowed_neighbors=path_corner2_allowed),
-    # Block('path_corner3', build_path_block_corner3, allowed_neighbors=path_corner3_allowed),
-    # Block('path_corner4', build_path_block_corner4, allowed_neighbors=path_corner4_allowed),
+    Block(name, globals()[f'build_{name}'], allowed_neighbors=allowed_neighbors[name])
+    for name in path_blocks
 ]
 
 # --- Run WFC and build scene ---
