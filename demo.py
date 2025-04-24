@@ -148,16 +148,16 @@ scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
 
 # --- Block types ---
 
-def infer_allowed_neighbors(blocks, allowed_partial, directions=[(1,0),(0,1)]):
+def infer_allowed_neighbors(blocks, allowed_partial, directions=[(1,0,0),(0,1,0)]):
     """
-    Given a dict of allowed_neighbors for (1,0) and (0,1), infer (-1,0) and (0,-1).
-    Returns a new dict with all four directions.
+    Given a dict of allowed_neighbors for (1,0,0) and (0,1,0), infer (-1,0,0) and (0,-1,0).
+    Returns a new dict with all four directions (in 3D, dz=0).
     """
     # Start with a copy of the partial dict, using sets for easy updating
     full = {k: {d: set(v) for d, v in dct.items()} for k, dct in allowed_partial.items()}
     # Add missing directions
     for block in blocks:
-        for d, axis in [((1,0), (-1,0)), ((0,1), (0,-1))]:
+        for d, axis in [((1,0,0), (-1,0,0)), ((0,0,1), (0,0,-1))]:
             allowed = set()
             for other, other_dict in allowed_partial.items():
                 if block in other_dict.get(d, []):
@@ -173,20 +173,20 @@ def infer_allowed_neighbors(blocks, allowed_partial, directions=[(1,0),(0,1)]):
 path_blocks = ['path_x', 'path_z', 'path_cross','path_corner1']
 allowed_partial = {
     'path_x': {
-        (1,0): ['path_x','path_cross','path_corner1'],
-        (0,1): ['path_x']
+        (1,0,0): ['path_x','path_cross','path_corner1'],
+        (0,0,1): ['path_x']
     },
     'path_z': {
-        (1,0): ['path_z'],
-        (0,1): ['path_z','path_cross']
+        (1,0,0): ['path_z'],
+        (0,0,1): ['path_z','path_cross']
     },
     'path_cross': {
-        (1,0): ['path_x','path_cross','path_corner1'],
-        (0,1): ['path_z','path_cross']
+        (1,0,0): ['path_x','path_cross','path_corner1'],
+        (0,0,1): ['path_z','path_cross']
     },
     'path_corner1': {
-        (1,0): ['path_z',],
-        (0,1): ['path_z', 'path_cross']
+        (1,0,0): ['path_z',],
+        (0,0,1): ['path_z', 'path_cross']
     }
 }
 
@@ -198,7 +198,7 @@ block_types = [
 ]
 
 # --- Run WFC and build scene ---
-wfc = WaveFunctionCollapse3D(10, 10, block_types)
+wfc = WaveFunctionCollapse3D(6, 2, 3, block_types)  # 6x3x6 grid for demo
 wfc.collapse()  # Seed for reproducibility
 wfc.build_scene(scene)
 scene.finish()
