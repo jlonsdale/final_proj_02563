@@ -16,36 +16,41 @@ def initgrid():
         voxel_grid[I] = ivec3(I.x * 3 - 60, I.y * 3, I.z * 3 - 60)  # Initialize with a default value
 
 @ti.kernel
-def build_vertical_pipe(scene: ti.template(), x: int, y: int, z: int):   
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 0, 1), 1, green)
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 1, 1), 1, green)
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 2, 1), 1, green)
+def build_vertical_pipe(scene: ti.template(), x: int, y: int, z: int):
+    green = vec3(0.0, 1.0, 0.0)  # Define a green color
+    scene.set_voxel(ivec3(3*x,3*y,3*z)+ ivec3(1, 0, 1), 1, green)
+    scene.set_voxel(ivec3(3*x,3*y,3*z)+ ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 2, 1), 1, green)
 
 @ti.kernel
 def build_horizontal_pipe(scene: ti.template(), x: int, y: int, z: int):
+    green = vec3(0.0, 1.0, 0.0)  # Define a green color
     scene.set_voxel(voxel_grid[x, y, z] + ivec3(0, 1, 1), 1, green)
     scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 1, 1), 1, green)
     scene.set_voxel(voxel_grid[x, y, z] + ivec3(2, 1, 1), 1, green)
 
 @ti.kernel
 def build_T_pipe(scene: ti.template(), x: int, y: int, z: int):
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 0, 1), 1, green)
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 1, 1), 1, green)
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 2, 1), 1, green)
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(2, 0, 1), 1, green)
+    green = vec3(0.0, 1.0, 0.0)  # Define a green color
+    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 0, 1), 1, green)
+    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 2, 1), 1, green)
+    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(2, 0, 1), 1, green)
 
 @ti.kernel
 def build_empty(scene: ti.template(), x: int, y: int, z: int):
     for i, j, k in ti.ndrange(3, 3, 3):
-        scene.set_voxel(voxel_grid[x, y, z]+vec3(i,j,k), 0, vec3(0.0, 0.0, 0.0))
+        scene.set_voxel(ivec3(3*x,3*y,3*z)+vec3(i,j,k), 0, vec3(0.0, 0.0, 0.0))
 
 @ti.kernel
 def build_vertical_stopper_top(scene: ti.template(), x: int, y: int, z: int): 
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 0, 1), 1, dark_green)
+    dark_green = vec3(0.0, 0.5, 0.0)  # Define a dark green color
+    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 0, 1), 1, dark_green)
 
 @ti.kernel
 def build_vertical_stopper_bottom(scene: ti.template(), x: int, y: int, z: int):
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 2, 1), 1, dark_green)
+    dark_green = vec3(0.0, 0.5, 0.0)  # Define a dark green color
+    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 2, 1), 1, dark_green)
     
 
 # --- Scene setup ---
@@ -140,7 +145,7 @@ block_types = [
 ]
 
 # --- Run WFC and build scene ---
-wfc = WaveFunctionCollapse3D(6, 2, 3, block_types)  # 6x3x6 grid for demo
+wfc = WaveFunctionCollapse3D(6, 6, 6, block_types)  # 6x3x6 grid for demo
 wfc.collapse()  # Seed for reproducibility
 wfc.build_scene(scene)
 scene.finish()
