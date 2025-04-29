@@ -1,3 +1,4 @@
+
 import taichi as ti
 import numpy as np
 from taichi.math import vec3, ivec3
@@ -60,19 +61,19 @@ class WaveFunctionCollapse3D:
                             stack.append((nx, ny, nz))
 
     def build_scene(self, scene):
-        # # print the grind
-        # print("Grid:")
-        # for x in range(self.width):
-        #     for y in range(self.height):
-        #         for z in range(self.depth):
-        #             print(f"({x}, {y}, {z}): {self.grid[x, y, z].name if self.grid[x, y, z] else 'None'}")
+        # print the grind
+        print("Grid:")
+        for x in range(self.width):
+            for y in range(self.height):
+                for z in range(self.depth):
+                    print(f"({x}, {y}, {z}): {self.grid[x, y, z].name if self.grid[x, y, z] else 'None'}")
         
         for x in range(self.width):
             for y in range(self.height):
                 for z in range(self.depth):
                     block = self.grid[x, y, z]
                     if block:
-                        block.build(scene, (x, y, z))
+                        block.build(scene, (3*x, 3*y, 3*z))
 
 # --- Example usage ---
 # from scene import Scene
