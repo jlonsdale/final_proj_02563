@@ -77,6 +77,9 @@ def build_empty(scene: ti.template(), x: int, y: int, z: int):
     for i, j, k in ti.ndrange(2, 2, 2):
         scene.set_voxel(ivec3(x,y,z)+vec3(i,j,k), 0, vec3(0.0, 0.0, 0.0))
 
+# NOTE: The stopper blocks (e.g., vertical_stopper_t, vertical_stopper_b, horizontal_stopper_e, horizontal_stopper_w)
+# have been commented out for now because they didn't look good visually in the generated scene.
+
 # @ti.kernel
 # def build_vertical_stopper_t(scene: ti.template(), x: int, y: int, z: int):
 #     ## connects top 
@@ -280,7 +283,7 @@ block_types = [
 ]
 
 # --- Run WFC and build scene ---
-wfc = WaveFunctionCollapse3D(10, 10, 10, block_types)  # 6x3x6 grid for demo
+wfc = WaveFunctionCollapse3D(2, 10, 2, block_types)  # 6x3x6 grid for demo
 wfc.collapse()  # Seed for reproducibility
 wfc.build_scene(scene)
 scene.finish()
