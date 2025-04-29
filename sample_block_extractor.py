@@ -130,6 +130,6 @@ if __name__ == "__main__":
     # Visualize all blocks in the scene, spaced apart
     for i, block_data in enumerate(blocks):
         block = Block(f"block_{i}", block_data, allowed_neighbors=allowed_neighbors.get(i, {}))
-        block.build(scene, ((i + 4) * (block_shape[0] + 1), 0, 0))
+        block.build(scene, ((i - 9) * (block_shape[0] + 1), 0, -5 ))
     scene.finish()
 
