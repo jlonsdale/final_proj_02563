@@ -7,51 +7,88 @@ from scene import Scene
 ti.init(arch=ti.gpu)  # Initialize Taichi
 
 green = vec3(0.0, 1.0, 0.0)  # Define a green color
-dark_green = vec3(0.0, 0.5, 0.0)  # Define a dark green color
-voxel_grid = ti.Vector.field(3, dtype=ti.i32, shape=(40, 20, 40))
-
-@ti.func
-def initgrid():
-    for I in ti.grouped(voxel_grid):
-        voxel_grid[I] = ivec3(I.x * 3 - 60, I.y * 3, I.z * 3 - 60)  # Initialize with a default value
+dark_green = vec3(0.0, 0.3, 0.0)  # Define a darker green color
 
 @ti.kernel
 def build_vertical_pipe(scene: ti.template(), x: int, y: int, z: int):
-    green = vec3(0.0, 1.0, 0.0)  # Define a green color
-    scene.set_voxel(ivec3(3*x,3*y,3*z)+ ivec3(1, 0, 1), 1, green)
-    scene.set_voxel(ivec3(3*x,3*y,3*z)+ ivec3(1, 1, 1), 1, green)
-    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 2, 1), 1, green)
+    # connects top & bottom
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(1, 0, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z) + ivec3(1, 2, 1), 1, green)
 
 @ti.kernel
-def build_horizontal_pipe(scene: ti.template(), x: int, y: int, z: int):
-    green = vec3(0.0, 1.0, 0.0)  # Define a green color
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(0, 1, 1), 1, green)
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(1, 1, 1), 1, green)
-    scene.set_voxel(voxel_grid[x, y, z] + ivec3(2, 1, 1), 1, green)
+def build_horizontal_pipe_ew(scene: ti.template(), x: int, y: int, z: int):
+    # connects east & west
+    scene.set_voxel(ivec3(x, y, z) + ivec3(0, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(2, 1, 1), 1, green)
 
 @ti.kernel
-def build_T_pipe(scene: ti.template(), x: int, y: int, z: int):
-    green = vec3(0.0, 1.0, 0.0)  # Define a green color
-    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 0, 1), 1, green)
-    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 1, 1), 1, green)
-    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 2, 1), 1, green)
-    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(2, 0, 1), 1, green)
+def build_horizontal_pipe_ns(scene: ti.template(), x: int, y: int, z: int):
+    # connects north & south
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 1, 0), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 1, 2), 1, green)
+
+@ti.kernel
+def build_T_pipe_tbe(scene: ti.template(), x: int, y: int, z: int):
+    # connects top & bottom & east
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(1, 0, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z) + ivec3(1, 2, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(2, 1, 1), 1, green)
+
+@ti.kernel
+def build_T_pipe_ewt(scene: ti.template(), x: int, y: int, z: int):
+    # connects east & west & top
+    scene.set_voxel(ivec3(x, y, z) + ivec3(0, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(2, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 2, 1), 1, green)
+
+@ti.kernel
+def build_T_pipe_nsb(scene: ti.template(), x: int, y: int, z: int):
+    # connects north & south & bottom
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 1, 0), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 1, 2), 1, green)
+    scene.set_voxel(ivec3(x, y, z) + ivec3(1, 0, 1), 1, green)
+
+@ti.kernel
+def build_crosssection_pipe(scene: ti.template(), x: int, y: int, z: int):
+    # connects top, bottom, east, west, north, south
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(1, 0, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(1, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z) + ivec3(1, 2, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(2, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(1, 1, 2), 1, green)
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(0, 1, 1), 1, green)
+    scene.set_voxel(ivec3(x,y,z)+ ivec3(1, 1, 0), 1, green)
 
 @ti.kernel
 def build_empty(scene: ti.template(), x: int, y: int, z: int):
-    for i, j, k in ti.ndrange(3, 3, 3):
-        scene.set_voxel(ivec3(3*x,3*y,3*z)+vec3(i,j,k), 0, vec3(0.0, 0.0, 0.0))
+    for i, j, k in ti.ndrange(2, 2, 2):
+        scene.set_voxel(ivec3(x,y,z)+vec3(i,j,k), 0, vec3(0.0, 0.0, 0.0))
 
 @ti.kernel
-def build_vertical_stopper_top(scene: ti.template(), x: int, y: int, z: int): 
-    dark_green = vec3(0.0, 0.5, 0.0)  # Define a dark green color
-    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 0, 1), 1, dark_green)
+def build_vertical_stopper_t(scene: ti.template(), x: int, y: int, z: int):
+    ## connects top 
+    scene.set_voxel(ivec3(x,y,z) + ivec3(1, 2, 1), 1, dark_green)
 
 @ti.kernel
-def build_vertical_stopper_bottom(scene: ti.template(), x: int, y: int, z: int):
-    dark_green = vec3(0.0, 0.5, 0.0)  # Define a dark green color
-    scene.set_voxel(ivec3(3*x,3*y,3*z) + ivec3(1, 2, 1), 1, dark_green)
-    
+def build_vertical_stopper_b(scene: ti.template(), x: int, y: int, z: int):
+    ## connects bottom 
+    scene.set_voxel(ivec3(x,y,z) + ivec3(1, 0, 1), 1, dark_green)
+
+@ti.kernel
+def build_horizontal_stopper_e(scene: ti.template(), x: int, y: int, z: int):
+    ## connects east
+    scene.set_voxel(ivec3(x,y,z) + ivec3(0, 0, 1), 1, dark_green)
+
+@ti.kernel
+def build_horizontal_stopper_w(scene: ti.template(), x: int, y: int, z: int):
+    ## connects west 
+    scene.set_voxel(ivec3(x,y,z) + ivec3(2, 0, 1), 1, dark_green)
 
 # --- Scene setup ---
 scene = Scene(voxel_edges=0, exposure=1)
@@ -85,67 +122,159 @@ def infer_allowed_neighbors(blocks, allowed_partial, directions=[(1,0,0),(0,1,0)
 
 
 # Example usage for path blocks:
-path_blocks = ["vertical_pipe", "horizontal_pipe", "T_pipe", "empty", "vertical_stopper_top", "vertical_stopper_bottom"]
-allowed_partial = {
-    'vertical_pipe': {
-        (0,1,0): ['vertical_pipe', 'T_pipe', 'vertical_stopper_top'],  # Top neighbors
-        (0,-1,0): ['vertical_pipe', 'T_pipe', 'vertical_stopper_bottom'],  # Bottom neighbors
-        (1,0,0): ['horizontal_pipe', 'T_pipe'],  # East neighbors
-        (0,0,1): ['horizontal_pipe', 'T_pipe'],  # South neighbors
-        (-1,0,0): ['horizontal_pipe', 'T_pipe'],  # West neighbors
-        (0,0,-1): ['horizontal_pipe', 'T_pipe']  # North neighbors
-    },
-    'horizontal_pipe': {
-        (0,1,0): ['T_pipe', 'vertical_pipe'],  # Top neighbors
-        (0,-1,0): ['T_pipe', 'vertical_pipe'],  # Bottom neighbors
-        (1,0,0): ['horizontal_pipe', 'T_pipe'],  # East neighbors
-        (0,0,1): ['horizontal_pipe', 'T_pipe'],  # South neighbors
-        (-1,0,0): ['horizontal_pipe', 'T_pipe'],  # West neighbors
-        (0,0,-1): ['horizontal_pipe', 'T_pipe']  # North neighbors
-    },
-    'T_pipe': {
-        (0,1,0): ['vertical_pipe', 'T_pipe', 'vertical_stopper_top'],  # Top neighbors
-        (0,-1,0): ['vertical_pipe', 'T_pipe', 'vertical_stopper_bottom'],  # Bottom neighbors
-        (1,0,0): ['horizontal_pipe', 'T_pipe'],  # East neighbors
-        (0,0,1): ['horizontal_pipe', 'T_pipe'],  # South neighbors
-        (-1,0,0): ['horizontal_pipe', 'T_pipe'],  # West neighbors
-        (0,0,-1): ['horizontal_pipe', 'T_pipe']  # North neighbors
-    },
-    'empty': {
-        (0,1,0): ['empty'],  # Top neighbors
-        (0,-1,0): ['empty'],  # Bottom neighbors
-        (1,0,0): ['empty'],  # East neighbors
-        (0,0,1): ['empty'],  # South neighbors
-        (-1,0,0): ['empty'],  # West neighbors
-        (0,0,-1): ['empty']  # North neighbors
-    },
-    'vertical_stopper_top': {
-        (0,1,0): ['empty'],  # Top neighbors
-        (0,-1,0): ['vertical_pipe', 'T_pipe'],  # Bottom neighbors
-        (1,0,0): ['horizontal_pipe', 'T_pipe'],  # East neighbors
-        (0,0,1): ['horizontal_pipe', 'T_pipe'],  # South neighbors
-        (-1,0,0): ['horizontal_pipe', 'T_pipe'],  # West neighbors
-        (0,0,-1): ['horizontal_pipe', 'T_pipe']  # North neighbors
-    },
-    'vertical_stopper_bottom': {
-        (0,1,0): ['vertical_pipe', 'T_pipe'],  # Top neighbors
-        (0,-1,0): ['empty'],  # Bottom neighbors
-        (1,0,0): ['horizontal_pipe', 'T_pipe'],  # East neighbors
-        (0,0,1): ['horizontal_pipe', 'T_pipe'],  # South neighbors
-        (-1,0,0): ['horizontal_pipe', 'T_pipe'],  # West neighbors
-        (0,0,-1): ['horizontal_pipe', 'T_pipe']  # North neighbors
-    }
+possible_blocks = [
+"vertical_pipe", #connects top & bottom
+ "horizontal_pipe_ew", #connects east & west
+ "horizontal_pipe_ns", #connects north & south
+ "T_pipe_tbe", #connects top & bottom & east
+ "T_pipe_ewt", #connects east & west & top
+ "T_pipe_nsb", #connects north & south & bottom
+ "crosssection_pipe", #connects top, bottom, east, west, north, south
+ "vertical_stopper_t", #connects top
+ "vertical_stopper_b", #connects bottom      
+ "horizontal_stopper_e", #connects east
+ "horizontal_stopper_w",  #connects west
+ "empty" #connects west nowhere
+ ]
+
+pipe_connections = {
+    "vertical_pipe": ["t", "b"],  # connects top & bottom
+    "horizontal_pipe_ew": ["e", "w"],  # connects east & west
+    "horizontal_pipe_ns": ["n", "s"],  # connects north & south
+    "T_pipe_tbe": ["t", "b", "e"],  # connects top & bottom & east
+    "T_pipe_ewt": ["e", "w", "t"],  # connects east & west & top
+    "T_pipe_nsb": ["n", "s", "b"],  # connects north & south & bottom
+    "crosssection_pipe": ["t", "b", "e", "w", "n", "s"],  # connects top, bottom, east, west, north, south
+    "vertical_stopper_t": ["t"],  # connects top
+    "vertical_stopper_b": ["b"],  # connects bottom
+    "horizontal_stopper_e": ["e"],  # connects east
+    "horizontal_stopper_w": ["w"],  # connects west
+    "empty": []  # connects nowhere
 }
 
-allowed_neighbors = infer_allowed_neighbors(path_blocks, allowed_partial)
+connections_without_n = {key: value for key, value in pipe_connections.items() if 'n' not in value}
+connections_without_s = {key: value for key, value in pipe_connections.items() if 's' not in value}
+connections_without_e = {key: value for key, value in pipe_connections.items() if 'e' not in value}
+connections_without_w = {key: value for key, value in pipe_connections.items() if 'w' not in value}
+connections_without_t = {key: value for key, value in pipe_connections.items() if 't' not in value}
+connections_without_b = {key: value for key, value in pipe_connections.items() if 'b' not in value}
+
+connections_with_n = {key: value for key, value in pipe_connections.items() if 'n' in value}
+connections_with_s = {key: value for key, value in pipe_connections.items() if 's' in value}
+connections_with_e = {key: value for key, value in pipe_connections.items() if 'e' in value}
+connections_with_w = {key: value for key, value in pipe_connections.items() if 'w' in value}
+connections_with_t = {key: value for key, value in pipe_connections.items() if 't' in value}
+connections_with_b = {key: value for key, value in pipe_connections.items() if 'b' in value}
+
+allowed_partial = {
+    'vertical_pipe': {
+        (0,1,0): list(connections_with_b.keys()),  # Top neighbors - add pipe_connections that connect [b]
+        (0,-1,0): list(connections_with_t.keys()),  # Bottom neighbors - add pipe_connections that connect [t]
+        (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+    'horizontal_pipe_ew': {
+        (0,1,0): list(connections_without_b.keys()),  # Top neighbors - add pipe_connections that DON'T connect [b]
+        (0,-1,0): list(connections_without_t.keys()),  # Bottom neighbors - add pipe_connections that DON'T connect [t]
+        (1,0,0): list(connections_with_w.keys()),  # East neighbors - add all pipe_connections that connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_with_e.keys()),  # West neighbors - add all pipe_connections that connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+    'horizontal_pipe_ns': {
+        (0,1,0): list(connections_without_b.keys()),  # Top neighbors - add pipe_connections that DON'T connect [b]
+        (0,-1,0): list(connections_without_t.keys()),  # Bottom neighbors - add pipe_connections that DON'T connect [t]
+        (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
+        (0,0,1): list(connections_with_n.keys()),  # South neighbors - add all pipe_connections that connect [n]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (0,0,-1): list(connections_with_s.keys())  # North neighbors - add all pipe_connections that connect [s]
+    },
+    'T_pipe_tbe': {
+        (0,1,0): list(connections_with_b.keys()),  # Top neighbors - add pipe_connections that connect [b]
+        (0,-1,0): list(connections_with_t.keys()),  # Bottom neighbors - add pipe_connections that connect [t]
+        (1,0,0): list(connections_with_w.keys()),  # East neighbors - add all pipe_connections that connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+    'T_pipe_ewt': {
+        (0,1,0): list(connections_with_b.keys()),  # Top neighbors - add pipe_connections that connect [b]
+        (0,-1,0): list(connections_without_t.keys()),  # Bottom neighbors - add pipe_connections that DON'T connect [t]
+        (1,0,0): list(connections_with_w.keys()),  # East neighbors - add all pipe_connections that connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_with_e.keys()),  # West neighbors - add all pipe_connections that connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+    "T_pipe_nsb": {
+        (0,1,0): list(connections_without_b.keys()),  # Top neighbors - add pipe_connections that DON'T connect [b]
+        (0,-1,0): list(connections_with_t.keys()),  # Bottom neighbors - add pipe_connections that connect [t]
+        (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
+        (0,0,1): list(connections_with_n.keys()),  # South neighbors - add all pipe_connections that connect [n]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (0,0,-1): list(connections_with_s.keys())  # North neighbors - add all pipe_connections that connect [s]
+    },
+    "crosssection_pipe": {
+        (0,1,0): list(connections_with_b.keys()),  # Top neighbors - add pipe_connections that connect [b]
+        (0,-1,0): list(connections_with_t.keys()),  # Bottom neighbors - add pipe_connections that connect [t]
+        (1,0,0): list(connections_with_w.keys()),  # East neighbors - add all pipe_connections that connect [w]
+        (0,0,1): list(connections_with_n.keys()),  # South neighbors - add all pipe_connections that connect [n]
+        (-1,0,0): list(connections_with_e.keys()),  # West neighbors - add all pipe_connections that connect [e]
+        (0,0,-1): list(connections_with_s.keys())  # North neighbors - add all pipe_connections that connect [s]
+    },
+    'empty': {
+        (0,1,0): list(connections_without_b.keys()),  # Top neighbors - add pipe_connections that DON'T connect [b]
+        (0,-1,0): list(connections_without_t.keys()),  # Bottom neighbors - add pipe_connections that DON'T connect [t]
+        (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+    'vertical_stopper_t': {
+        (0,1,0): list(connections_with_b.keys()),  # Top neighbors - add pipe_connections that connect [b]
+        (0,-1,0): list(connections_without_t.keys()),  # Bottom neighbors - add pipe_connections that DON'T connect [t]
+        (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+    'vertical_stopper_b': {
+        (0,1,0): list(connections_without_b.keys()),  # Top neighbors - add pipe_connections that DON'T connect [b]
+        (0,-1,0): list(connections_with_t.keys()),  # Bottom neighbors - add pipe_connections that connect [t]
+        (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+    "horizontal_stopper_e": {
+        (0,1,0): list(connections_without_b.keys()),  # Top neighbors - add pipe_connections that DON'T connect [b]
+        (0,-1,0): list(connections_without_t.keys()),  # Bottom neighbors - add pipe_connections that DON'T connect [t]
+        (1,0,0): list(connections_with_w.keys()),  # East neighbors - add all pipe_connections that connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+    "horizontal_stopper_w": {
+        (0,1,0): list(connections_without_b.keys()),  # Top neighbors - add pipe_connections that DON'T connect [b]
+        (0,-1,0): list(connections_without_t.keys()),  # Bottom neighbors - add pipe_connections that DON'T connect [t]
+        (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
+        (0,0,1): list(connections_without_n.keys()),  # South neighbors - add all pipe_connections that DON'T connect [n]
+        (-1,0,0): list(connections_with_e.keys()),  # West neighbors - add all pipe_connections that connect [e]
+        (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
+    },
+}
+
+allowed_neighbors = infer_allowed_neighbors(possible_blocks, allowed_partial)
 
 block_types = [
     Block(name, globals()[f'build_{name}'], allowed_neighbors=allowed_neighbors[name])
-    for name in path_blocks
+    for name in possible_blocks
 ]
 
 # --- Run WFC and build scene ---
-wfc = WaveFunctionCollapse3D(6, 6, 6, block_types)  # 6x3x6 grid for demo
+wfc = WaveFunctionCollapse3D(6, 3, 6, block_types)  # 6x3x6 grid for demo
 wfc.collapse()  # Seed for reproducibility
 wfc.build_scene(scene)
 scene.finish()
+
