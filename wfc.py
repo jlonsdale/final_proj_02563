@@ -4,13 +4,14 @@ from taichi.math import vec3, ivec3
 
 @ti.kernel
 def build_kernel(scene: ti.template(), x: int, y: int, z: int, data: ti.types.ndarray()):
-    for i, j, k in ti.ndrange(3, 3, 3):
+    sx, sy, sz, _ = data.shape
+    for i, j, k in ti.ndrange(sx, sy, sz):
         r = data[i, j, k, 0]
         g = data[i, j, k, 1]
         b = data[i, j, k, 2]
         mat = int(data[i, j, k, 3])
         if mat != 0:
-            scene.set_voxel(ivec3(x+i, y+j, z+k), mat, vec3(r, g, b))
+            scene.set_voxel(ivec3(x + i, y + j, z + k), mat, vec3(r, g, b))
 # --- Block class ---
 class Block:
     def __init__(self, name, data, allowed_neighbors=None):
