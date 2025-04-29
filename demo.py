@@ -136,7 +136,7 @@ possible_blocks = [
  "T_pipe_tbe", #connects top & bottom & east
  "T_pipe_ewt", #connects east & west & top
  "T_pipe_nsb", #connects north & south & bottom
-# "crosssection_pipe", #connects top, bottom, east, west, north, south
+ "crosssection_pipe", #connects top, bottom, east, west, north, south
 #  "vertical_stopper_t", #connects top
 #  "vertical_stopper_b", #connects bottom      
 #  "horizontal_stopper_e", #connects east
