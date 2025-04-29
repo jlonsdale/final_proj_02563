@@ -1,18 +1,26 @@
-
 import taichi as ti
 import numpy as np
 from taichi.math import vec3, ivec3
 
+@ti.kernel
+def build_kernel(scene: ti.template(), x: int, y: int, z: int, data: ti.types.ndarray()):
+    for i, j, k in ti.ndrange(3, 3, 3):
+        r = data[i, j, k, 0]
+        g = data[i, j, k, 1]
+        b = data[i, j, k, 2]
+        mat = int(data[i, j, k, 3])
+        if mat != 0:
+            scene.set_voxel(ivec3(x+i, y+j, z+k), mat, vec3(r, g, b))
 # --- Block class ---
 class Block:
-    def __init__(self, name, recipe_func, allowed_neighbors=None):
+    def __init__(self, name, data, allowed_neighbors=None):
         self.name = name
-        self.recipe_func = recipe_func  # Function to build this block in the scene
-        # allowed_neighbors: dict of (dx, dy, dz) -> list of allowed block names
+        # data: numpy array of shape (3,3,3,4) with (r,g,b,mat)
+        self.data = data.astype(np.float32)
         self.allowed_neighbors = allowed_neighbors or {}
 
     def build(self, scene, pos):
-        self.recipe_func(scene, pos[0], pos[1], pos[2])
+        build_kernel(scene, pos[0], pos[1], pos[2], self.data)
 
 # --- WFC 3D class ---
 class WaveFunctionCollapse3D:
