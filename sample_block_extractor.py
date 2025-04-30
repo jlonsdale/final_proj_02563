@@ -143,9 +143,24 @@ def make_sample_scene():
     # The rest is air (material 0)
     return arr
 
+def make_sample_scene_with_blocks():
+        # Create a 4x4x4 scene with 4 channels (r,g,b,mat)
+    arr = np.zeros((4, 4, 4, 4), dtype=np.float32)
+    # Fill with colored cubes to cover the area
+    arr[0:2, 0:2, 0:2, 0:3] = (1.0, 0.0, 0.0)  # Red cube
+    arr[0:2, 0:2, 2:4, 0:3] = (0.0, 1.0, 0.0)  # Green cube
+    arr[2:4, 0:2, 0:2, 0:3] = (0.0, 0.0, 1.0)  # Blue cube
+    arr[2:4, 2:4, 2:4, 0:3] = (1.0, 1.0, 0.0)  # Yellow cube
+    arr[0:2, 2:4, 0:2, 0:3] = (1.0, 0.0, 1.0)  # Magenta cube
+    arr[2:4, 0:2, 2:4, 0:3] = (0.0, 1.0, 1.0)  # Cyan cube
+    arr[0:2, 2:4, 2:4, 0:3] = (0.5, 0.5, 0.5)  # Gray cube
+    arr[2:4, 2:4, 0:2, 0:3] = (1.0, 0.5, 0.0)  # Orange cube
+    arr[..., 3] = 1  # Set material to 1 everywhere
+    return arr
+
 if __name__ == "__main__":
     from scene import Scene
-    sample_scene = make_sample_scene()
+    sample_scene = make_sample_scene_with_blocks()
     block_shape = (2, 2, 2)
     extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
     block_objects = extractor.get_block_objects()
@@ -153,7 +168,7 @@ if __name__ == "__main__":
     scene = Scene(voxel_edges=0, exposure=1)
     scene.set_floor(0, (1.0, 1.0, 1.0))
     scene.set_background_color((0.5, 0.5, 0.4))
-    scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
+    scene.set_directional_light((1, 1, 1), 0.1, (1, 0.8, 0.6))
     from wfc import build_kernel
     # Visualize the original sample scene at the origin
     build_kernel(scene, 0, 0, 0, sample_scene)
