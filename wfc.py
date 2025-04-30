@@ -34,6 +34,11 @@ class WaveFunctionCollapse3D:
         self.grid = np.full((width, height, depth), None)  # Collapsed block at each cell
         # Store sets of block names instead of Block objects
         self.possible_blocks = [[[set(self.block_types_by_name.keys()) for _ in range(depth)] for _ in range(height)] for _ in range(width)]
+        # Determine block shape from the first block
+        if len(block_types) > 0:
+            self.block_shape = block_types[0].data.shape[:3]
+        else:
+            self.block_shape = (1, 1, 1)
 
     def collapse(self):
         # MVP: Randomly pick a cell with lowest entropy and collapse
@@ -76,13 +81,13 @@ class WaveFunctionCollapse3D:
             for y in range(self.height):
                 for z in range(self.depth):
                     print(f"({x}, {y}, {z}): {self.grid[x, y, z].name if self.grid[x, y, z] else 'None'}")
-        
+        bx, by, bz = self.block_shape
         for x in range(self.width):
             for y in range(self.height):
                 for z in range(self.depth):
                     block = self.grid[x, y, z]
                     if block:
-                        block.build(scene, (3*x, 3*y, 3*z))
+                        block.build(scene, (bx*x, by*y, bz*z))
 
 if __name__ == "__main__":
     import sample_block_extractor
@@ -90,7 +95,7 @@ if __name__ == "__main__":
     
     # Create a sample scene
     sample_scene = sample_block_extractor.make_sample_scene()
-    block_shape = (3, 3, 3)
+    block_shape = (2, 2, 2)
     extractor = sample_block_extractor.SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
