@@ -67,12 +67,11 @@ class WaveFunctionCollapse3D:
                     allowed_names = set()
                     for block_name in self.possible_blocks[cx][cy][cz]:
                         allowed_names |= set(self.block_types_by_name[block_name].allowed_neighbors.get((dx, dy, dz), []))
-                    if allowed_names:
-                        before = self.possible_blocks[nx][ny][nz]
-                        self.possible_blocks[nx][ny][nz] = self.possible_blocks[nx][ny][nz].intersection(allowed_names)
-                        after = self.possible_blocks[nx][ny][nz]
-                        if len(after) < len(before):
-                            stack.append((nx, ny, nz))
+                    before = self.possible_blocks[nx][ny][nz]
+                    self.possible_blocks[nx][ny][nz] = self.possible_blocks[nx][ny][nz].intersection(allowed_names)
+                    after = self.possible_blocks[nx][ny][nz]
+                    if len(after) < len(before):
+                        stack.append((nx, ny, nz))
 
     def build_scene(self, scene):
         # print the grind
@@ -95,7 +94,7 @@ if __name__ == "__main__":
     
     # Create a sample scene
     sample_scene = sample_block_extractor.make_sample_scene()
-    block_shape = (2, 2, 2)
+    block_shape = (4, 3, 4)
     extractor = sample_block_extractor.SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
@@ -104,7 +103,7 @@ if __name__ == "__main__":
     scene.set_background_color((0.5, 0.5, 0.4))
     scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
     
-    wfc = WaveFunctionCollapse3D(10, 10, 10, block_objects)
+    wfc = WaveFunctionCollapse3D(2, 10, 2, block_objects)
     wfc.collapse()
     wfc.build_scene(scene)
     scene.finish()

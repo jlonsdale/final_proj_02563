@@ -90,10 +90,13 @@ class SampleBlockExtractor:
         color1 = face1[..., :3].reshape(-1, 3)
         color2 = face2[..., :3].reshape(-1, 3)
         # Find indices where material matches
-        mat_mask = (mat1 == mat2)
-        if np.all((mat1 == 0) & (mat2 == 0)):
-            # Both faces are air, treat as perfect match
+        if np.all(mat1 == 0) or np.all(mat2 == 0):
+            # One face is all air, treat as perfect match
             return True
+        mat_mask = (mat1 == mat2)
+        # if both voxels are air, treat as perfect match
+        mat_mask = np.logical_xor(mat_mask, (mat1 == 0) & (mat2 == 0))
+    
         if not np.any(mat_mask):
             # No matching material, cannot connect
             return False
@@ -175,7 +178,7 @@ def make_sample_scene_with_blocks():
 if __name__ == "__main__":
     from scene import Scene
     sample_scene = make_sample_scene()
-    block_shape = (2, 2, 2)
+    block_shape = (4, 3, 4)
     extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
