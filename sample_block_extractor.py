@@ -2,6 +2,7 @@ import random
 import numpy as np
 from typing import Tuple, List, Dict
 from collections import defaultdict
+from wfc import Block
 
 class SampleBlockExtractor:
     def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95):
@@ -94,6 +95,17 @@ class SampleBlockExtractor:
         # Convert sets to lists for easier use
         return {idx: {d: list(neighs) for d, neighs in dirs.items()} for idx, dirs in self.allowed_neighbors.items()}
 
+    def get_block_objects(self):
+        """
+        Returns a list of Block objects (from wfc.py) with unique names and proper allowed_neighbors (by index).
+        """
+        block_objects = []
+        allowed_neighbors = self.get_allowed_neighbors()
+        for i, block_data in enumerate(self.blocks):
+            name = f"block_{i}"
+            neighbors = allowed_neighbors.get(i, {})
+            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors))
+        return block_objects
 
 
 # --- DEMO: Extract blocks from a sample scene ---
@@ -117,28 +129,25 @@ if __name__ == "__main__":
     sample_scene = make_sample_scene()
     block_shape = (2, 2, 2)
     extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
-    blocks = extractor.get_blocks()
-    allowed_neighbors = extractor.get_allowed_neighbors()
-    print(f"Extracted {len(blocks)} unique blocks.")
+    block_objects = extractor.get_block_objects()
+    print(f"Extracted {len(block_objects)} unique blocks.")
     scene = Scene(voxel_edges=0, exposure=1)
     scene.set_floor(0, (1.0, 1.0, 1.0))
     scene.set_background_color((0.5, 0.5, 0.4))
     scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
-    from wfc import Block, build_kernel
+    from wfc import build_kernel
     # Visualize the original sample scene at the origin
     build_kernel(scene, 0, 0, 0, sample_scene)
     # Visualize all blocks in the scene, spaced apart
-    for i, block_data in enumerate(blocks):
-        block = Block(f"block_{i}", block_data, allowed_neighbors=allowed_neighbors.get(i, {}))
+    for i, block in enumerate(block_objects):
         base_pos = ((i - 9) * (block_shape[0] + 1), 0, -5)
         block.build(scene, base_pos)
         # Build all possible neighbors in all directions, stacking them vertically
         stack_y = 1
-        for direction, neighbor_indices in allowed_neighbors.get(i, {}).items():
+        for direction, neighbor_indices in block.allowed_neighbors.items():
             print(f"Building neighbors for block {i} in direction {direction}: {neighbor_indices}")
             for neighbor_idx in neighbor_indices:
-                neighbor_block_data = blocks[neighbor_idx]
-                neighbor_block = Block(f"block_{neighbor_idx}_above_{i}_dir_{direction}", neighbor_block_data, allowed_neighbors=allowed_neighbors.get(neighbor_idx, {}))
+                neighbor_block = block_objects[neighbor_idx]
                 neighbor_pos = (base_pos[0], base_pos[1] + stack_y * (block_shape[1] + 1), base_pos[2])
                 neighbor_block.build(scene, neighbor_pos)
                 stack_y += 1
