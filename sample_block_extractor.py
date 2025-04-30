@@ -41,6 +41,7 @@ class SampleBlockExtractor:
             (0, 0, 1),  # +z (south)
             (0, 0, -1), # -z (north)
         ]
+        # 1. Add neighbors from the sample
         for (i, j, k), idx in block_map.items():
             for d, (dx, dy, dz) in enumerate(directions):
                 ni, nj, nk = i + dx, j + dy, k + dz
@@ -48,6 +49,13 @@ class SampleBlockExtractor:
                     idx2 = block_map[(ni, nj, nk)]
                     if self._blocks_can_connect(self.blocks[idx], self.blocks[idx2], (dx, dy, dz)):
                         self.allowed_neighbors[idx][(dx, dy, dz)].add(idx2)
+        # 2. For each block, check all possible connections in all directions
+        num_blocks = len(self.blocks)
+        for idx1 in range(num_blocks):
+            for d, direction in enumerate(directions):
+                for idx2 in range(num_blocks):
+                    if self._blocks_can_connect(self.blocks[idx1], self.blocks[idx2], direction):
+                        self.allowed_neighbors[idx1][direction].add(idx2)
 
     def _hash_block(self, block: np.ndarray) -> int:
         # Use a hash of the bytes for uniqueness
@@ -110,14 +118,20 @@ class SampleBlockExtractor:
 
     def get_block_objects(self):
         """
-        Returns a list of Block objects (from wfc.py) with unique names and proper allowed_neighbors (by index).
+        Returns a list of Block objects (from wfc.py) with unique names and allowed_neighbors using block names.
         """
-        block_objects = []
+        idx_to_name = {i: f"block_{i}" for i in range(len(self.blocks))}
         allowed_neighbors = self.get_allowed_neighbors()
-        for i, block_data in enumerate(self.blocks):
-            name = f"block_{i}"
-            neighbors = allowed_neighbors.get(i, {})
-            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors))
+        block_objects = []
+        for idx, block_data in enumerate(self.blocks):
+            name = idx_to_name[idx]
+            neighbors = allowed_neighbors.get(idx, {})
+            # Map neighbor indices to names for each direction
+            neighbors_named = {
+                direction: [idx_to_name[n_idx] for n_idx in neighbor_indices]
+                for direction, neighbor_indices in neighbors.items()
+            }
+            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named))
         return block_objects
 
 
@@ -160,28 +174,30 @@ def make_sample_scene_with_blocks():
 
 if __name__ == "__main__":
     from scene import Scene
-    sample_scene = make_sample_scene_with_blocks()
+    sample_scene = make_sample_scene()
     block_shape = (2, 2, 2)
     extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
-    scene = Scene(voxel_edges=0, exposure=1)
+    scene = Scene(voxel_edges=0.1, exposure=1)
     scene.set_floor(0, (1.0, 1.0, 1.0))
     scene.set_background_color((0.5, 0.5, 0.4))
     scene.set_directional_light((1, 1, 1), 0.1, (1, 0.8, 0.6))
     from wfc import build_kernel
     # Visualize the original sample scene at the origin
-    build_kernel(scene, 0, 0, 0, sample_scene)
+    build_kernel(scene, 0, 0, 10, sample_scene)
+    # Build a mapping from block name to block object for easy lookup
+    name_to_block = {block.name: block for block in block_objects}
     # Visualize all blocks in the scene, spaced apart
     for i, block in enumerate(block_objects):
         base_pos = ((i - 9) * (block_shape[0] + 1), 0, -5)
         block.build(scene, base_pos)
         # Build all possible neighbors in all directions, stacking them vertically
         stack_y = 1
-        for direction, neighbor_indices in block.allowed_neighbors.items():
-            print(f"Building neighbors for block {i} in direction {direction}: {neighbor_indices}")
-            for neighbor_idx in neighbor_indices:
-                neighbor_block = block_objects[neighbor_idx]
+        for direction, neighbor_names in block.allowed_neighbors.items():
+            print(f"Building neighbors for {block.name} in direction {direction}: {neighbor_names}")
+            for neighbor_name in neighbor_names:
+                neighbor_block = name_to_block[neighbor_name]
                 neighbor_pos = (base_pos[0], base_pos[1] + stack_y * (block_shape[1] + 1), base_pos[2])
                 neighbor_block.build(scene, neighbor_pos)
                 stack_y += 1
