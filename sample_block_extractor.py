@@ -76,9 +76,22 @@ class SampleBlockExtractor:
             face2 = block2[:, :, -1, :]
         else:
             raise ValueError("Invalid direction")
-        # Only compare color (first 3 channels)
-        f1 = face1[..., :3].reshape(-1, 3)
-        f2 = face2[..., :3].reshape(-1, 3)
+        # Only compare where material matches
+        mat1 = face1[..., 3].reshape(-1)
+        mat2 = face2[..., 3].reshape(-1)
+        color1 = face1[..., :3].reshape(-1, 3)
+        color2 = face2[..., :3].reshape(-1, 3)
+        # Find indices where material matches
+        mat_mask = (mat1 == mat2)
+        if np.all((mat1 == 0) & (mat2 == 0)):
+            # Both faces are air, treat as perfect match
+            return True
+        if not np.any(mat_mask):
+            # No matching material, cannot connect
+            return False
+        # Only compare color where material matches
+        f1 = color1[mat_mask]
+        f2 = color2[mat_mask]
         # Avoid division by zero
         norm1 = np.linalg.norm(f1, axis=1, keepdims=True) + 1e-8
         norm2 = np.linalg.norm(f2, axis=1, keepdims=True) + 1e-8
@@ -112,16 +125,22 @@ class SampleBlockExtractor:
 def make_sample_scene():
     # Create a 4x4x4 scene with 4 channels (r,g,b,mat)
     arr = np.zeros((4, 4, 4, 4), dtype=np.float32)
-    # Fill with colored cubes to cover the area
-    arr[0:2, 0:2, 0:2, 0:3] = (1.0, 0.0, 0.0)  # Red cube
-    arr[0:2, 0:2, 2:4, 0:3] = (0.0, 1.0, 0.0)  # Green cube
-    arr[2:4, 0:2, 0:2, 0:3] = (0.0, 0.0, 1.0)  # Blue cube
-    arr[2:4, 2:4, 2:4, 0:3] = (1.0, 1.0, 0.0)  # Yellow cube
-    arr[0:2, 2:4, 0:2, 0:3] = (1.0, 0.0, 1.0)  # Magenta cube
-    arr[2:4, 0:2, 2:4, 0:3] = (0.0, 1.0, 1.0)  # Cyan cube
-    arr[0:2, 2:4, 2:4, 0:3] = (0.5, 0.5, 0.5)  # Gray cube
-    arr[2:4, 2:4, 0:2, 0:3] = (1.0, 0.5, 0.0)  # Orange cube
-    arr[..., 3] = 1  # Set material to 1 everywhere
+    # Floor: solid material (1), gray color, at y=0
+    arr[:, 0, :, 0:3] = (0.5, 0.5, 0.5)
+    arr[:, 0, :, 3] = 1
+    # Vertical pipe: light material (2), yellow color, at x=2, from y=1 to y=3
+    arr[2, 1:4, 2, 0:3] = (1.0, 1.0, 0.2)
+    arr[2, 1:4, 2, 3] = 2
+    # Horizontal pipe: light material (2), cyan color, at y=2, from x=0 to x=3
+    arr[0:4, 2, 1, 0:3] = (0.2, 1.0, 1.0)
+    arr[0:4, 2, 1, 3] = 2
+    # Solid block in a corner: solid material (1), red color, at (3,3,3)
+    arr[3, 3, 3, 0:3] = (1.0, 0.2, 0.2)
+    arr[3, 3, 3, 3] = 1
+    # Another solid block: solid material (1), blue color, at (0,3,1)
+    arr[0, 3, 1, 0:3] = (0.2, 0.2, 1.0)
+    arr[0, 3, 1, 3] = 1
+    # The rest is air (material 0)
     return arr
 
 if __name__ == "__main__":
