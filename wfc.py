@@ -84,12 +84,22 @@ class WaveFunctionCollapse3D:
                     if block:
                         block.build(scene, (3*x, 3*y, 3*z))
 
-# --- Example usage ---
-# from scene import Scene
-# scene = Scene(...)
-# block_types = [Block('grass', vec3(0.03, 0.45, 0.03), grass_block_recipe), ...]
-# wfc = WaveFunctionCollapse3D(width, height, depth, block_types)
-# wfc.collapse()
-# wfc.build_scene(scene)
-
-# Extend Block and WaveFunctionCollapse3D for more features as needed.
+if __name__ == "__main__":
+    import sample_block_extractor
+    from scene import Scene
+    
+    # Create a sample scene
+    sample_scene = sample_block_extractor.make_sample_scene()
+    block_shape = (3, 3, 3)
+    extractor = sample_block_extractor.SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
+    block_objects = extractor.get_block_objects()
+    print(f"Extracted {len(block_objects)} unique blocks.")
+    scene = Scene(voxel_edges=0, exposure=1)
+    scene.set_floor(0, (1.0, 1.0, 1.0))
+    scene.set_background_color((0.5, 0.5, 0.4))
+    scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
+    
+    wfc = WaveFunctionCollapse3D(10, 10, 10, block_objects)
+    wfc.collapse()
+    wfc.build_scene(scene)
+    scene.finish()
