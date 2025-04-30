@@ -130,6 +130,17 @@ if __name__ == "__main__":
     # Visualize all blocks in the scene, spaced apart
     for i, block_data in enumerate(blocks):
         block = Block(f"block_{i}", block_data, allowed_neighbors=allowed_neighbors.get(i, {}))
-        block.build(scene, ((i - 9) * (block_shape[0] + 1), 0, -5 ))
+        base_pos = ((i - 9) * (block_shape[0] + 1), 0, -5)
+        block.build(scene, base_pos)
+        # Build all possible neighbors in all directions, stacking them vertically
+        stack_y = 1
+        for direction, neighbor_indices in allowed_neighbors.get(i, {}).items():
+            print(f"Building neighbors for block {i} in direction {direction}: {neighbor_indices}")
+            for neighbor_idx in neighbor_indices:
+                neighbor_block_data = blocks[neighbor_idx]
+                neighbor_block = Block(f"block_{neighbor_idx}_above_{i}_dir_{direction}", neighbor_block_data, allowed_neighbors=allowed_neighbors.get(neighbor_idx, {}))
+                neighbor_pos = (base_pos[0], base_pos[1] + stack_y * (block_shape[1] + 1), base_pos[2])
+                neighbor_block.build(scene, neighbor_pos)
+                stack_y += 1
     scene.finish()
 
