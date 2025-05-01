@@ -5,18 +5,21 @@ from collections import defaultdict
 from wfc import Block
 
 class SampleBlockExtractor:
-    def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95):
+    def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0):
         """
         sample_scene: (A, B, C, 4) numpy array
         block_shape: (Nx, Ny, Nz)
         similarity_threshold: threshold for average cosine similarity to consider two block faces connectable
+        neighbor_distance: distance to consider for neighbor connections
         """
         self.sample_scene = sample_scene
         self.block_shape = block_shape
         self.similarity_threshold = similarity_threshold
+        self.neighbor_distance = neighbor_distance
         self.blocks = []  # List of unique blocks (as np.ndarray)
         self.block_indices = {}  # Map from block hash to index in self.blocks
         self.allowed_neighbors = defaultdict(lambda: defaultdict(set))  # block_idx -> direction -> set(block_idx)
+        self.block_origins = []  # Store the origin of each block in the sample
         self._extract_blocks_and_connections()
 
     def _extract_blocks_and_connections(self):
@@ -31,6 +34,7 @@ class SampleBlockExtractor:
                     if block_hash not in self.block_indices:
                         self.block_indices[block_hash] = len(self.blocks)
                         self.blocks.append(block)
+                        self.block_origins.append((i, j, k))
                     block_map[(i, j, k)] = self.block_indices[block_hash]
         # Now, infer connections
         directions = [
@@ -47,70 +51,121 @@ class SampleBlockExtractor:
                 ni, nj, nk = i + dx, j + dy, k + dz
                 if (ni, nj, nk) in block_map:
                     idx2 = block_map[(ni, nj, nk)]
-                    if self._blocks_can_connect(self.blocks[idx], self.blocks[idx2], (dx, dy, dz)):
+                    if self._blocks_can_connect(idx, idx2, (dx, dy, dz)):
                         self.allowed_neighbors[idx][(dx, dy, dz)].add(idx2)
         # 2. For each block, check all possible connections in all directions
         num_blocks = len(self.blocks)
         for idx1 in range(num_blocks):
             for d, direction in enumerate(directions):
                 for idx2 in range(num_blocks):
-                    if self._blocks_can_connect(self.blocks[idx1], self.blocks[idx2], direction):
+                    if self._blocks_can_connect(idx1, idx2, direction):
                         self.allowed_neighbors[idx1][direction].add(idx2)
+
+    def _get_sample_neighbor_region(self, block_origin, direction, n):
+        # Returns the region of the sample_scene that was adjacent to the block at block_origin in direction, thickness n
+        i, j, k = block_origin
+        Nx, Ny, Nz = self.block_shape
+        if direction == (1, 0, 0):
+            region = self.sample_scene[i+Nx:i+Nx+n, j:j+Ny, k:k+Nz, :]
+        elif direction == (-1, 0, 0):
+            region = self.sample_scene[i-n:i, j:j+Ny, k:k+Nz, :]
+        elif direction == (0, 1, 0):
+            region = self.sample_scene[i:i+Nx, j+Ny:j+Ny+n, k:k+Nz, :]
+        elif direction == (0, -1, 0):
+            region = self.sample_scene[i:i+Nx, j-n:j, k:k+Nz, :]
+        elif direction == (0, 0, 1):
+            region = self.sample_scene[i:i+Nx, j:j+Ny, k+Nz:k+Nz+n, :]
+        elif direction == (0, 0, -1):
+            region = self.sample_scene[i:i+Nx, j:j+Ny, k-n:k, :]
+        else:
+            raise ValueError("Invalid direction")
+        return region
+
+    def _blocks_can_connect(self, idx1: int, idx2: int, direction: Tuple[int, int, int]) -> bool:
+        block1 = self.blocks[idx1]
+        block2 = self.blocks[idx2]
+        # Compare the face of block1 and the opposite face of block2 along the direction
+        if self.neighbor_distance == 0:
+            if direction == (1, 0, 0):  # block1 +x face, block2 -x face
+                face1 = block1[-1, :, :, :]
+                face2 = block2[0, :, :, :]
+            elif direction == (-1, 0, 0):
+                face1 = block1[0, :, :, :]
+                face2 = block2[-1, :, :, :]
+            elif direction == (0, 1, 0):
+                face1 = block1[:, -1, :, :]
+                face2 = block2[:, 0, :, :]
+            elif direction == (0, -1, 0):
+                face1 = block1[:, 0, :, :]
+                face2 = block2[:, -1, :, :]
+            elif direction == (0, 0, 1):
+                face1 = block1[:, :, -1, :]
+                face2 = block2[:, :, 0, :]
+            elif direction == (0, 0, -1):
+                face1 = block1[:, :, 0, :]
+                face2 = block2[:, :, -1, :]
+            else:
+                raise ValueError("Invalid direction")
+            mat1 = face1[..., 3].reshape(-1)
+            mat2 = face2[..., 3].reshape(-1)
+            color1 = face1[..., :3].reshape(-1, 3)
+            color2 = face2[..., :3].reshape(-1, 3)
+            if np.all(mat1 == 0) or np.all(mat2 == 0):
+                return True
+            mat_mask = (mat1 == mat2)
+            mat_mask = np.logical_xor(mat_mask, (mat1 == 0) & (mat2 == 0))
+            if not np.any(mat_mask):
+                return False
+            f1 = color1[mat_mask]
+            f2 = color2[mat_mask]
+            norm1 = np.linalg.norm(f1, axis=1, keepdims=True) + 1e-8
+            norm2 = np.linalg.norm(f2, axis=1, keepdims=True) + 1e-8
+            f1n = f1 / norm1
+            f2n = f2 / norm2
+            cos_sim = np.sum(f1n * f2n, axis=1)
+            avg_sim = np.mean(cos_sim)
+            return avg_sim >= self.similarity_threshold
+        else:
+            n = self.neighbor_distance
+            block1_origin = self.block_origins[idx1]
+            region1 = self._get_sample_neighbor_region(block1_origin, direction, n)
+            if direction == (1, 0, 0):
+                region2 = block2[:n, :, :, :]
+            elif direction == (-1, 0, 0):
+                region2 = block2[-n:, :, :, :]
+            elif direction == (0, 1, 0):
+                region2 = block2[:, :n, :, :]
+            elif direction == (0, -1, 0):
+                region2 = block2[:, -n:, :, :]
+            elif direction == (0, 0, 1):
+                region2 = block2[:, :, :n, :]
+            elif direction == (0, 0, -1):
+                region2 = block2[:, :, -n:, :]
+            else:
+                raise ValueError("Invalid direction")
+            mat1 = region1[..., 3].reshape(-1)
+            mat2 = region2[..., 3].reshape(-1)
+            color1 = region1[..., :3].reshape(-1, 3)
+            color2 = region2[..., :3].reshape(-1, 3)
+            if np.all(mat1 == 0) or np.all(mat2 == 0):
+                return True
+            mat_mask = (mat1 == mat2)
+            mat_mask = np.logical_xor(mat_mask, (mat1 == 0) & (mat2 == 0))
+            if not np.any(mat_mask):
+                return False
+            f1 = color1[mat_mask]
+            f2 = color2[mat_mask]
+            norm1 = np.linalg.norm(f1, axis=1, keepdims=True) + 1e-8
+            norm2 = np.linalg.norm(f2, axis=1, keepdims=True) + 1e-8
+            f1n = f1 / norm1
+            f2n = f2 / norm2
+            cos_sim = np.sum(f1n * f2n, axis=1)
+            avg_sim = np.mean(cos_sim)
+            return avg_sim >= self.similarity_threshold
 
     def _hash_block(self, block: np.ndarray) -> int:
         # Use a hash of the bytes for uniqueness
-        return hash(block.tobytes())  # Uncomment for a real hash
-
-    def _blocks_can_connect(self, block1: np.ndarray, block2: np.ndarray, direction: Tuple[int, int, int]) -> bool:
-        # Compare the face of block1 and the opposite face of block2 along the direction
-        # Faces are (Nx, Ny, Nz, 4)
-        if direction == (1, 0, 0):  # block1 +x face, block2 -x face
-            face1 = block1[-1, :, :, :]
-            face2 = block2[0, :, :, :]
-        elif direction == (-1, 0, 0):
-            face1 = block1[0, :, :, :]
-            face2 = block2[-1, :, :, :]
-        elif direction == (0, 1, 0):
-            face1 = block1[:, -1, :, :]
-            face2 = block2[:, 0, :, :]
-        elif direction == (0, -1, 0):
-            face1 = block1[:, 0, :, :]
-            face2 = block2[:, -1, :, :]
-        elif direction == (0, 0, 1):
-            face1 = block1[:, :, -1, :]
-            face2 = block2[:, :, 0, :]
-        elif direction == (0, 0, -1):
-            face1 = block1[:, :, 0, :]
-            face2 = block2[:, :, -1, :]
-        else:
-            raise ValueError("Invalid direction")
-        # Only compare where material matches
-        mat1 = face1[..., 3].reshape(-1)
-        mat2 = face2[..., 3].reshape(-1)
-        color1 = face1[..., :3].reshape(-1, 3)
-        color2 = face2[..., :3].reshape(-1, 3)
-        # Find indices where material matches
-        if np.all(mat1 == 0) or np.all(mat2 == 0):
-            # One face is all air, treat as perfect match
-            return True
-        mat_mask = (mat1 == mat2)
-        # if both voxels are air, treat as perfect match
-        mat_mask = np.logical_xor(mat_mask, (mat1 == 0) & (mat2 == 0))
-    
-        if not np.any(mat_mask):
-            # No matching material, cannot connect
-            return False
-        # Only compare color where material matches
-        f1 = color1[mat_mask]
-        f2 = color2[mat_mask]
-        # Avoid division by zero
-        norm1 = np.linalg.norm(f1, axis=1, keepdims=True) + 1e-8
-        norm2 = np.linalg.norm(f2, axis=1, keepdims=True) + 1e-8
-        f1n = f1 / norm1
-        f2n = f2 / norm2
-        cos_sim = np.sum(f1n * f2n, axis=1)
-        avg_sim = np.mean(cos_sim)
-        return avg_sim >= self.similarity_threshold
+        return hash(block.tobytes())
 
     def get_blocks(self) -> List[np.ndarray]:
         return self.blocks
@@ -178,7 +233,7 @@ def make_sample_scene_with_blocks():
 if __name__ == "__main__":
     from scene import Scene
     sample_scene = make_sample_scene()
-    block_shape = (3, 3, 3)
+    block_shape = (4, 1, 4)
     extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
