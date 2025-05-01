@@ -14,6 +14,6 @@ ToDo:
   - Decide what to do on the edge of the sampled scene - Match on air, itsself, anything or nothing or even a combination ?
     
 - Work on a simple city sample scene to test the above
-- - Add functionality for pre-collapsing one or more cells ?
+- Add functionality for pre-collapsing one or more cells ?
  
 
