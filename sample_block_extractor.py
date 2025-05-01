@@ -86,10 +86,16 @@ class SampleBlockExtractor:
         Compare two faces or regions for connectability based on material and color similarity.
         Returns True if connectable, False otherwise.
         """
+        if arr1.shape != arr2.shape:
+            # resize the the biggest one to the smallest one
+            min_shape = np.minimum(arr1.shape, arr2.shape)
+            arr1 = arr1[tuple(slice(0, s) for s in min_shape)]
+            arr2 = arr2[tuple(slice(0, s) for s in min_shape)]
         mat1 = arr1[..., 3].reshape(-1)
         mat2 = arr2[..., 3].reshape(-1)
         color1 = arr1[..., :3].reshape(-1, 3)
         color2 = arr2[..., :3].reshape(-1, 3)
+        # here is one of the matrices is empty we will have a match. The array can be empty if block is on the edge of the scene
         if np.all(mat1 == 0) or np.all(mat2 == 0):
             return True
         mat_mask = (mat1 == mat2)
@@ -222,7 +228,7 @@ if __name__ == "__main__":
     from scene import Scene
     sample_scene = make_sample_scene()
     block_shape = (4, 1, 4)
-    extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=2)
+    extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=1)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
     scene = Scene(voxel_edges=0.1, exposure=1)
