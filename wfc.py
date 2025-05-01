@@ -49,7 +49,7 @@ class WaveFunctionCollapse3D:
                     if self.grid[x, y, z] is None:
                         options = self.possible_blocks[x][y][z]
                         if options:
-                            chosen_name = self.rng.choice(list(options))
+                            chosen_name = self.rng.choice(sorted(options))
                             chosen = self.block_types_by_name[chosen_name]
                             self.grid[x, y, z] = chosen
                             self.possible_blocks[x][y][z] = {chosen_name}
@@ -95,16 +95,18 @@ if __name__ == "__main__":
     
     # Create a sample scene
     sample_scene = sample_block_extractor.make_sample_scene()
-    block_shape = (4, 3, 4)
+    block_shape = (2, 2, 2)
     extractor = sample_block_extractor.SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
+    wfc = WaveFunctionCollapse3D(2, 10, 2, block_objects, seed=42)
+    
+    
     scene = Scene(voxel_edges=0.1, exposure=1)
     scene.set_floor(0, (1.0, 1.0, 1.0))
     scene.set_background_color((0.5, 0.5, 0.4))
     scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
     
-    wfc = WaveFunctionCollapse3D(2, 10, 2, block_objects, seed=42)
     wfc.collapse()
     wfc.build_scene(scene)
     scene.finish()
