@@ -95,7 +95,7 @@ if __name__ == "__main__":
     
     # Create a sample scene
     sample_scene = sample_block_extractor.make_sample_scene()
-    block_shape = (2, 2, 2)
+    block_shape = (3, 2, 3)
     extractor = sample_block_extractor.SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
