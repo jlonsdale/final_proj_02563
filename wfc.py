@@ -25,7 +25,7 @@ class Block:
 
 # --- WFC 3D class ---
 class WaveFunctionCollapse3D:
-    def __init__(self, width, height, depth, block_types):
+    def __init__(self, width, height, depth, block_types, seed=None):
         self.width = width
         self.height = height
         self.depth = depth
@@ -39,6 +39,7 @@ class WaveFunctionCollapse3D:
             self.block_shape = block_types[0].data.shape[:3]
         else:
             self.block_shape = (1, 1, 1)
+        self.rng = np.random.default_rng(seed)
 
     def collapse(self):
         # MVP: Randomly pick a cell with lowest entropy and collapse
@@ -48,7 +49,7 @@ class WaveFunctionCollapse3D:
                     if self.grid[x, y, z] is None:
                         options = self.possible_blocks[x][y][z]
                         if options:
-                            chosen_name = np.random.choice(list(options))
+                            chosen_name = self.rng.choice(list(options))
                             chosen = self.block_types_by_name[chosen_name]
                             self.grid[x, y, z] = chosen
                             self.possible_blocks[x][y][z] = {chosen_name}
@@ -103,7 +104,7 @@ if __name__ == "__main__":
     scene.set_background_color((0.5, 0.5, 0.4))
     scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
     
-    wfc = WaveFunctionCollapse3D(2, 10, 2, block_objects)
+    wfc = WaveFunctionCollapse3D(2, 10, 2, block_objects, seed=42)
     wfc.collapse()
     wfc.build_scene(scene)
     scene.finish()
