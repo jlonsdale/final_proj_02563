@@ -23,23 +23,34 @@ class WaveFunctionCollapse3D:
         self.block_types = block_types  # List of Block objects
         self.block_types_by_name = {b.name: b for b in block_types}
         self.grid = np.full((width, height, depth), None)  # Collapsed block at each cell
-        # Store sets of block names instead of Block objects
         self.possible_blocks = [[[set(self.block_types_by_name.keys()) for _ in range(depth)] for _ in range(height)] for _ in range(width)]
 
     def collapse(self):
-        # MVP: Randomly pick a cell with lowest entropy and collapse
-        for x in range(self.width):
-            for y in range(self.height):
-                for z in range(self.depth):
-                    if self.grid[x, y, z] is None:
-                        options = self.possible_blocks[x][y][z]
-                        if options:
-                            chosen_name = np.random.choice(list(options))
-                            chosen = self.block_types_by_name[chosen_name]
-                            self.grid[x, y, z] = chosen
-                            self.possible_blocks[x][y][z] = {chosen_name}
-                            self.propagate(x, y, z)
-        # (This is a naive MVP, not a full WFC implementation)
+        # Collapse the cell with the lowest entropy (smallest number of options)
+        while True:
+            min_options = float('inf')
+            min_cell = None
+
+            for x in range(self.width):
+                for y in range(self.height):
+                    for z in range(self.depth):
+                        if self.grid[x, y, z] is None:
+                            options = self.possible_blocks[x][y][z]
+                            if 0 < len(options) < min_options:
+                                min_options = len(options)
+                                min_cell = (x, y, z)
+
+            if min_cell is None:
+                # All cells are collapsed
+                break
+
+            x, y, z = min_cell
+            options = self.possible_blocks[x][y][z]
+            chosen_name = np.random.choice(list(options))
+            chosen = self.block_types_by_name[chosen_name]
+            self.grid[x, y, z] = chosen
+            self.possible_blocks[x][y][z] = {chosen_name}
+            self.propagate(x, y, z)
 
     def propagate(self, x, y, z):
         # Stack-based propagation: propagate constraints until no more changes
