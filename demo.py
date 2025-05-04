@@ -1,3 +1,4 @@
+import numpy as np
 import taichi as ti
 from taichi.math import vec3
 from wfc import Block, WaveFunctionCollapse3D
@@ -259,7 +260,7 @@ allowed_partial = {
         (0,-1,0): list(connections_with_t.keys()),  # Bottom neighbors - add pipe_connections that connect [t]
         (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
         (0,0,1): list(connections_with_n.keys()),  # South neighbors - add all pipe_connections that connect [n]
-        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add pipe_connections that DON'T connect [e]
         (0,0,-1): list(connections_with_s.keys())  # North neighbors - add all pipe_connections that connect [s]
     },
     "crosssection_pipe": {
@@ -291,7 +292,7 @@ allowed_partial = {
         (0,-1,0): list(connections_without_t.keys()),  # Bottom neighbors - add pipe_connections that DON'T connect [t]
         (1,0,0): list(connections_without_w.keys()),  # East neighbors - add all pipe_connections that DON'T connect [w]
         (0,0,1): list(connections_with_n.keys()),  # South neighbors - add all pipe_connections that connect [n]
-        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add all pipe_connections that DON'T connect [e]
+        (-1,0,0): list(connections_without_e.keys()),  # West neighbors - add pipe_connections that DON'T connect [e]
         (0,0,-1): list(connections_without_s.keys())  # North neighbors - add all pipe_connections that DON'T connect [s]
     },
     'vertical_stopper_t': {
