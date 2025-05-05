@@ -302,7 +302,7 @@ for name in expanded_block_types:
     block_types.append(block)
     
 # --- Run WFC and build scene ---
-wfc = WaveFunctionCollapse3D(10, 10, 1, block_types)  # 6x3x6 grid for demo
+wfc = WaveFunctionCollapse3D(10, 10, 2, block_types)  # 6x3x6 grid for demo
 wfc.collapse()  # Seed for reproducibility
 wfc.build_scene(scene)
 scene.finish()

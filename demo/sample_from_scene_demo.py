@@ -53,16 +53,51 @@ def make_sample_scene():
     # The rest is air (material 0)
     return arr
 
-###########################
-# A pink and blue L shape #
-###########################
+##################################
+# A pink, green and blue U shape #
+##################################
+
 def make_sample_scene_2():
-    arr = np.zeros((4, 4, 4, 4), dtype=np.float32)
+    arr = np.zeros((5, 5, 5, 4), dtype=np.float32)
     arr[:, 0, :, 0:3] = green
-    arr[:, 0, :, 3] = 1
-    # Left wall: solid material (1), bright pink color
-    arr[0, :, :, 0:3] = pink
-    arr[0, :, :, 3] = 1
+    arr[:, 0, :, 3] = 2
+    arr[0, :, :, 0:3] = purple
+    arr[0, :, :, 3] = 2
+    arr[4, :, :, 0:3] = blue
+    arr[4, :, :, 3] = 2
+    return arr
+
+
+##################################
+# A cyan, red and orange T shape #
+##################################
+
+def make_sample_scene_3():
+    arr = np.zeros((5, 5, 5, 4), dtype=np.float32)
+    arr[0:2, 0, :, 0:3] = orange
+    arr[0:2, 0, :, 3] = 2
+    arr[2, :, :, 0:3] = cyan
+    arr[2, :, :, 3] = 2
+    arr[3:5, 0, :, 0:3] = red
+    arr[3:5, 0, :, 3] = 2
+    return arr
+
+
+####################################
+# open white cube with black edges #
+####################################
+
+def make_sample_scene_3():
+    arr = np.zeros((5, 5, 5, 4), dtype=np.float32)
+    arr[:, :4, :, 0:3] = white
+    arr[:, :4, :, 3] = 2
+    arr[0:5, 0:5, 0, 0:3] = black
+    arr[0:5, 0:5, 0, 3] = 1
+    arr[0:5, 0, 0:5, 0:3] = black
+    arr[0:5, 0, 0:5, 3] = 1
+    arr[0, 0:5, 0:5, 0:3] = black
+    arr[0, 0:5, 0:5, 3] = 1
+
     return arr
 
 #call this function to visualize the blocks and their neighbors
@@ -96,15 +131,14 @@ def block_debugger_and_viewer(sample_scene):
     scene.finish()
 
 
-#block_debugger_and_viewer(make_sample_scene)
-
+# block_debugger_and_viewer(make_sample_scene_3)
 
 sample_scene = make_sample_scene_2()
-block_shape = (2, 1, 2)
+block_shape = (4, 1, 4)
 extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
 block_objects = extractor.get_block_objects()
 print(f"Extracted {len(block_objects)} unique blocks.")
-wfc = WaveFunctionCollapse3D(5, 2, 5, block_objects, seed=42)
+wfc = WaveFunctionCollapse3D(4, 20, 4, block_objects)
 
 
 scene = Scene(voxel_edges=0.1, exposure=1)
