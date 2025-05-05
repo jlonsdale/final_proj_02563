@@ -134,7 +134,7 @@ def block_debugger_and_viewer(sample_scene):
 # block_debugger_and_viewer(make_sample_scene_3)
 
 sample_scene = make_sample_scene_2()
-block_shape = (4, 1, 4)
+block_shape = (4, 2, 4)
 extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=0.99)
 block_objects = extractor.get_block_objects()
 print(f"Extracted {len(block_objects)} unique blocks.")
