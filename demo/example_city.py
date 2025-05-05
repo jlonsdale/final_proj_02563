@@ -1,6 +1,12 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '../utils'))  # Dynamically add the utils directory to the path
+print(sys.path)
+
 from scene import Scene
 import taichi as ti
 from taichi.math import *
+import os
 
 ti.init(arch=ti.gpu)  # Initialize Taichi
 
