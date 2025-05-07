@@ -100,43 +100,6 @@ def make_sample_scene_3():
 
     return arr
 
-#call this function to visualize the blocks and their neighbors
-def block_debugger_and_viewer(sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=1):
-    """
-    Visualize blocks and their neighbors using the same parameters as the main WFC demo.
-    Args:
-        sample_scene: np.ndarray or callable returning np.ndarray
-        block_shape: tuple of ints
-        similarity_threshold: float
-        neighbor_distance: int
-    """
-    if callable(sample_scene):
-        sample_scene = sample_scene()
-    extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=similarity_threshold, neighbor_distance=neighbor_distance)
-    block_objects = extractor.get_block_objects()
-    print(f"Extracted {len(block_objects)} unique blocks.")
-    scene = Scene(voxel_edges=0.1, exposure=1)
-    scene.set_floor(0, (1.0, 1.0, 1.0))
-    scene.set_background_color((0.5, 0.5, 0.4))
-    scene.set_directional_light((1, 1, 1), 0.1, (1, 0.8, 0.6))
-    # Visualize the original sample scene at the origin
-    build_kernel(scene, 0, 0, 10, sample_scene)
-    # Build a mapping from block name to block object for easy lookup
-    name_to_block = {block.name: block for block in block_objects}
-    # Visualize all blocks in the scene, spaced apart
-    for i, block in enumerate(block_objects):
-        base_pos = ((i - 9) * (block_shape[0] + 1), 0, -5)
-        block.build(scene, base_pos)
-        # Build all possible neighbors in all directions, stacking them vertically
-        stack_y = 1
-        for direction, neighbor_names in block.allowed_neighbors.items():
-            print(f"Building neighbors for {block.name} in direction {direction}: {neighbor_names}")
-            for neighbor_name in neighbor_names:
-                neighbor_block = name_to_block[neighbor_name]
-                neighbor_pos = (base_pos[0], base_pos[1] + stack_y * (block_shape[1] + 1), base_pos[2])
-                neighbor_block.build(scene, neighbor_pos)
-                stack_y += 1
-    scene.finish()
 
 #call this function to visualize the blocks and their neighbors in the same scene
 def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=1, base_z=30):
