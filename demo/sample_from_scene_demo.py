@@ -102,13 +102,13 @@ def make_sample_scene_3():
 
 
 #call this function to visualize the blocks and their neighbors in the same scene
-def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=1, base_z=30):
+def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=1, compatibility_map= None, base_z=30):
     """
     Visualize blocks and their neighbors in the given scene at a specified z position.
     """
     if callable(sample_scene):
         sample_scene = sample_scene()
-    extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=similarity_threshold, neighbor_distance=neighbor_distance)
+    extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=similarity_threshold, neighbor_distance=neighbor_distance, material_compatibility_map=compatibility_map)
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
     # Visualize the original sample scene at the origin, but at base_z
@@ -135,8 +135,22 @@ sample_scene = make_sample_scene_2()
 block_shape = (4, 2, 4)
 similarity_threshold = 0.99
 neighbor_distance = 1
+material_compatibility_map = {
+    frozenset([0, 0]): 1.0,
+    frozenset([1, 1]): 1.0,
+    frozenset([2, 2]): 1.0,
+    frozenset([0, 1]): 0.5,
+    frozenset([0, 2]): 1.0,
+    frozenset([1, 2]): 0.0,
+}
 
-extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=similarity_threshold, neighbor_distance=neighbor_distance)
+extractor = SampleBlockExtractor(
+    sample_scene,
+    block_shape,
+    similarity_threshold=similarity_threshold,
+    neighbor_distance=neighbor_distance,
+    material_compatibility_map=material_compatibility_map,
+    )
 block_objects = extractor.get_block_objects()
 print(f"Extracted {len(block_objects)} unique blocks.")
 wfc = WaveFunctionCollapse3D(4, 20, 4, block_objects)
@@ -148,7 +162,7 @@ scene.set_background_color((0.5, 0.5, 0.4))
 scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
 
 # Build block debugger visualization at z=30
-block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similarity_threshold=0.99, base_z=30)
+block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, compatibility_map=material_compatibility_map, similarity_threshold=similarity_threshold, base_z=30)
 
 wfc.collapse()
 wfc.build_scene(scene)
