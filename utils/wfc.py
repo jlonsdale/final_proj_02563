@@ -63,7 +63,7 @@ class WaveFunctionCollapse3D:
 
             x, y, z = min_cell
             options = self.possible_blocks[x][y][z]
-            chosen_name = np.random.choice(list(options))
+            chosen_name = self.rng.choice(sorted(list(options)))
             chosen = self.block_types_by_name[chosen_name]
             self.grid[x, y, z] = chosen
             self.possible_blocks[x][y][z] = {chosen_name}
