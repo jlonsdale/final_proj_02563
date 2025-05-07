@@ -159,6 +159,7 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
         # Build all possible neighbors in all directions, stacking them vertically
         stack_y = 1
         for direction, neighbor_names in block.allowed_neighbors.items():
+            print(f"Building neighbors for {block.name} in direction {direction}: {neighbor_names}")
             for neighbor_name in neighbor_names:
                 neighbor_block = name_to_block[neighbor_name]
                 neighbor_pos = (base_pos[0], base_pos[1] + stack_y * (block_shape[1] + 1), base_pos[2])
@@ -170,7 +171,7 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
 sample_scene = make_sample_scene_2()
 block_shape = (4, 2, 4)
 similarity_threshold = 0.99
-neighbor_distance = 2
+neighbor_distance = 1
 
 extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=similarity_threshold, neighbor_distance=neighbor_distance)
 block_objects = extractor.get_block_objects()
