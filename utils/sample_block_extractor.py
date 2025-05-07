@@ -5,12 +5,13 @@ from collections import defaultdict
 from wfc import Block
 
 class SampleBlockExtractor:
-    def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0):
+    def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None):
         """
         sample_scene: (A, B, C, 4) numpy array
         block_shape: (Nx, Ny, Nz)
         similarity_threshold: threshold for average cosine similarity to consider two block faces connectable
         neighbor_distance: distance to consider for neighbor connections
+        material_compatibility_map: dict mapping frozenset({mat1, mat2}) -> float in [0,1] for material compatibility
         """
         self.sample_scene = sample_scene
         self.block_shape = block_shape
@@ -20,6 +21,19 @@ class SampleBlockExtractor:
         self.block_indices = {}  # Map from block hash to index in self.blocks
         self.allowed_neighbors = defaultdict(lambda: defaultdict(set))  # block_idx -> direction -> set(block_idx)
         self.block_origins = []  # Store the origin of each block in the sample
+        if material_compatibility_map is None:
+            # By default, air (0) matches with light (2) and block (1) with 1.0
+            self.material_compatibility_map = {
+                frozenset([0, 0]): 1.0,
+                frozenset([0, 1]): 1.0,
+                frozenset([0, 2]): 1.0,
+                frozenset([1, 1]): 1.0,
+                frozenset([2, 2]): 1.0,
+                frozenset([1, 2]): 0.0,
+            }
+        else:
+            # Convert all keys to frozenset for safety
+            self.material_compatibility_map = {frozenset(k): v for k, v in material_compatibility_map.items()}
         self._extract_blocks_and_connections()
 
     def _extract_blocks_and_connections(self):
@@ -85,6 +99,7 @@ class SampleBlockExtractor:
         """
         Compare two faces or regions for connectability based on material and color similarity.
         Returns True if connectable, False otherwise.
+        Uses material_compatibility_map for material matching.
         """
         if arr1.shape != arr2.shape:
             # resize the the biggest one to the smallest one
@@ -95,22 +110,22 @@ class SampleBlockExtractor:
         mat2 = arr2[..., 3].reshape(-1)
         color1 = arr1[..., :3].reshape(-1, 3)
         color2 = arr2[..., :3].reshape(-1, 3)
-        # here is one of the matrices is empty we will have a match. The array can be empty if block is on the edge of the scene
-        if np.all(mat1 == 0) or np.all(mat2 == 0):
+        if mat1.size == 0 or mat2.size == 0:
             return True
-        mat_mask = (mat1 == mat2)
-        mat_mask = np.logical_xor(mat_mask, (mat1 == 0) & (mat2 == 0))
-        if not np.any(mat_mask):
-            return False
-        f1 = color1[mat_mask]
-        f2 = color2[mat_mask]
-        norm1 = np.linalg.norm(f1, axis=1, keepdims=True) + 1e-8
-        norm2 = np.linalg.norm(f2, axis=1, keepdims=True) + 1e-8
-        f1n = f1 / norm1
-        f2n = f2 / norm2
-        cos_sim = np.sum(f1n * f2n, axis=1)
-        avg_sim = np.mean(cos_sim)
-        return avg_sim >= self.similarity_threshold
+        similarities = []
+        for idx, (m1, m2) in enumerate(zip(mat1, mat2)):
+            key = frozenset([int(m1), int(m2)])
+            compat = self.material_compatibility_map.get(key, 0.0)
+            norm1 = np.linalg.norm(color1[idx])
+            norm2 = np.linalg.norm(color2[idx])
+            if norm1 == 0 or norm2 == 0:
+                cos_sim = 1.0 # Treat zero vectors as identical
+            else:
+                cos_sim = np.dot(color1[idx]/norm1, color2[idx]/norm2)
+            combined_sim = compat * cos_sim
+            similarities.append(combined_sim)
+        avg_similarity = np.mean(similarities)
+        return avg_similarity >= self.similarity_threshold
 
     def _blocks_can_connect(self, idx1: int, idx2: int, direction: Tuple[int, int, int]) -> bool:
         block1 = self.blocks[idx1]
