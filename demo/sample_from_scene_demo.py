@@ -141,7 +141,7 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
 sample_scene = make_sample_scene()
 block_shape = (2, 2, 2)
 similarity_threshold = 0.99
-neighbor_distance = 2
+neighbor_distance = 0
 material_compatibility_map = {
     frozenset([0, 0]): 1.0,
     frozenset([1, 1]): 1.0,

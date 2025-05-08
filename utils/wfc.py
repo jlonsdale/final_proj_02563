@@ -95,6 +95,10 @@ class WaveFunctionCollapse3D:
             for dx, dy, dz in directions:
                 nx, ny, nz = cx+dx, cy+dy, cz+dz
                 if 0 <= nx < self.width and 0 <= ny < self.height and 0 <= nz < self.depth and self.grid[nx, ny, nz] is None:
+                    if len(self.possible_blocks[cx][cy][cz]) == 0:
+                        # No options left, this should not 
+                        continue
+                        raise ValueError("No options left for cell ({}, {}, {})".format(cx, cy, cz))
                     allowed_names = set()
                     for block_name in self.possible_blocks[cx][cy][cz]:
                         allowed_names |= set(self.block_types_by_name[block_name].allowed_neighbors.get((dx, dy, dz), []))
