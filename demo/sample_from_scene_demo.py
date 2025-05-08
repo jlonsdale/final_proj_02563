@@ -102,13 +102,20 @@ def make_sample_scene_4():
 
 
 #call this function to visualize the blocks and their neighbors in the same scene
-def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=1, compatibility_map= None, base_z=30):
+def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=1, compatibility_map=None, base_z=30, allow_repeated_blocks=False):
     """
     Visualize blocks and their neighbors in the given scene at a specified z position.
     """
     if callable(sample_scene):
         sample_scene = sample_scene()
-    extractor = SampleBlockExtractor(sample_scene, block_shape, similarity_threshold=similarity_threshold, neighbor_distance=neighbor_distance, material_compatibility_map=compatibility_map)
+    extractor = SampleBlockExtractor(
+        sample_scene,
+        block_shape,
+        similarity_threshold=similarity_threshold,
+        neighbor_distance=neighbor_distance,
+        material_compatibility_map=compatibility_map,
+        allow_repeated_blocks=allow_repeated_blocks,
+    )
     block_objects = extractor.get_block_objects()
     print(f"Extracted {len(block_objects)} unique blocks.")
     # Visualize the original sample scene at the origin, but at base_z
@@ -132,18 +139,20 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
 # Example usage:
 
 sample_scene = make_sample_scene()
-block_shape = (4, 2, 4)
+block_shape = (3, 1, 3)
 similarity_threshold = 0.99
-neighbor_distance = 1
+neighbor_distance = 0
 material_compatibility_map = {
     frozenset([0, 0]): 1.0,
     frozenset([1, 1]): 1.0,
     frozenset([2, 2]): 1.0,
     # frozenset([0, 1]): 1.0,
-    frozenset([0, 2]): 1.0,
+    # frozenset([0, 2]): 1.0,
     frozenset([1, 2]): 0.0,
 }
 seed = 42
+
+allow_repeated_blocks = True  # Set to True to allow repeated blocks, False for unique blocks only
 
 extractor = SampleBlockExtractor(
     sample_scene,
@@ -151,7 +160,8 @@ extractor = SampleBlockExtractor(
     similarity_threshold=similarity_threshold,
     neighbor_distance=neighbor_distance,
     material_compatibility_map=material_compatibility_map,
-    )
+    allow_repeated_blocks=allow_repeated_blocks,
+)
 block_objects = extractor.get_block_objects()
 print(f"Extracted {len(block_objects)} unique blocks.")
 wfc = WaveFunctionCollapse3D(2, 20, 2, block_objects, seed=seed)
@@ -170,7 +180,8 @@ block_debugger_and_viewer_in_scene(
     compatibility_map=material_compatibility_map,
     neighbor_distance=neighbor_distance,
     similarity_threshold=similarity_threshold,
-    base_z=30)
+    base_z=30,
+    allow_repeated_blocks=allow_repeated_blocks)
 
 wfc.collapse()
 wfc.build_scene(scene)

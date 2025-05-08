@@ -5,19 +5,21 @@ from collections import defaultdict
 from wfc import Block
 
 class SampleBlockExtractor:
-    def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None):
+    def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None, allow_repeated_blocks: bool = False):
         """
         sample_scene: (A, B, C, 4) numpy array
         block_shape: (Nx, Ny, Nz)
         similarity_threshold: threshold for average cosine similarity to consider two block faces connectable
         neighbor_distance: distance to consider for neighbor connections
         material_compatibility_map: dict mapping frozenset({mat1, mat2}) -> float in [0,1] for material compatibility
+        allow_repeated_blocks: if True, blocks are not required to be unique (can repeat)
         """
         self.sample_scene = sample_scene
         self.block_shape = block_shape
         self.similarity_threshold = similarity_threshold
         self.neighbor_distance = neighbor_distance
-        self.blocks = []  # List of unique blocks (as np.ndarray)
+        self.allow_repeated_blocks = allow_repeated_blocks
+        self.blocks = []  # List of blocks (as np.ndarray)
         self.block_indices = {}  # Map from block hash to index in self.blocks
         self.allowed_neighbors = defaultdict(lambda: defaultdict(set))  # block_idx -> direction -> set(block_idx)
         self.block_origins = []  # Store the origin of each block in the sample
@@ -45,11 +47,18 @@ class SampleBlockExtractor:
                 for k in range(C - Nz + 1):
                     block = self.sample_scene[i:i+Nx, j:j+Ny, k:k+Nz, :].copy()
                     block_hash = self._hash_block(block)
-                    if block_hash not in self.block_indices:
-                        self.block_indices[block_hash] = len(self.blocks)
+                    if self.allow_repeated_blocks:
+                        # Always add the block, even if identical
+                        idx = len(self.blocks)
                         self.blocks.append(block)
                         self.block_origins.append((i, j, k))
-                    block_map[(i, j, k)] = self.block_indices[block_hash]
+                        block_map[(i, j, k)] = idx
+                    else:
+                        if block_hash not in self.block_indices:
+                            self.block_indices[block_hash] = len(self.blocks)
+                            self.blocks.append(block)
+                            self.block_origins.append((i, j, k))
+                        block_map[(i, j, k)] = self.block_indices[block_hash]
         # Now, infer connections
         directions = [
             (1, 0, 0),  # +x (east)
