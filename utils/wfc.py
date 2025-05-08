@@ -123,3 +123,25 @@ class WaveFunctionCollapse3D:
                     if block:
                         block.build(scene, (bx*x, by*y, bz*z))
 
+    def save_scene_as_ndarray(self, filename):
+        """
+        Save the current WFC grid as a numpy ndarray of voxel values.
+        The output shape is (width, height, depth, bx, by, bz, 4), where (bx, by, bz) is the block shape.
+        """
+        bx, by, bz = self.block_shape
+        arr = np.zeros((self.width, self.height, self.depth, bx, by, bz, 4), dtype=np.float32)
+        for x in range(self.width):
+            for y in range(self.height):
+                for z in range(self.depth):
+                    block = self.grid[x, y, z]
+                    if block is not None:
+                        arr[x, y, z] = block.data
+        np.save(filename, arr)
+
+    @staticmethod
+    def load_scene_from_ndarray(filename):
+        """
+        Load a WFC scene ndarray from file. Returns the ndarray.
+        """
+        return np.load(filename)
+

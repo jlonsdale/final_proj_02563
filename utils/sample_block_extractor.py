@@ -248,6 +248,21 @@ class SampleBlockExtractor:
             block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata))
         return block_objects
 
+    @staticmethod
+    def from_saved_scene(filename, block_shape, similarity_threshold=0.95, neighbor_distance=0, material_compatibility_map=None, allow_repeated_blocks=False):
+        """
+        Load a sample scene from a saved ndarray file and create a SampleBlockExtractor.
+        """
+        sample_scene = np.load(filename)
+        return SampleBlockExtractor(
+            sample_scene,
+            block_shape,
+            similarity_threshold=similarity_threshold,
+            neighbor_distance=neighbor_distance,
+            material_compatibility_map=material_compatibility_map,
+            allow_repeated_blocks=allow_repeated_blocks,
+        )
+
 
 
 
