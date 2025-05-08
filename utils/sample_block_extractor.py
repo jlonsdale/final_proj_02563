@@ -225,6 +225,7 @@ class SampleBlockExtractor:
     def get_block_objects(self):
         """
         Returns a list of Block objects (from wfc.py) with unique names and allowed_neighbors using block names.
+        Adds can_be_ground metadata if the block origin y==0.
         """
         idx_to_name = {i: f"block_{i}" for i in range(len(self.blocks))}
         allowed_neighbors = self.get_allowed_neighbors()
@@ -237,7 +238,14 @@ class SampleBlockExtractor:
                 direction: [idx_to_name[n_idx] for n_idx in neighbor_indices]
                 for direction, neighbor_indices in neighbors.items()
             }
-            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named))
+            # Add can_be_ground metadata if block origin y==0
+            origin = self.block_origins[idx]
+            metadata = {}
+            if origin[1] == 0:
+                metadata['can_be_ground'] = True
+            else:
+                metadata['can_be_ground'] = False
+            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata))
         return block_objects
 
 

@@ -15,26 +15,43 @@ def build_kernel(scene: ti.template(), x: int, y: int, z: int, data: ti.types.nd
             
 # --- Block class ---
 class Block:
-    def __init__(self, name, data, allowed_neighbors=None):
+    def __init__(self, name, data, allowed_neighbors=None, metadata=None):
         self.name = name
         # data: numpy array of shape (3,3,3,4) with (r,g,b,mat)
         self.data = data.astype(np.float32)
         self.allowed_neighbors = allowed_neighbors or {}
+        self.metadata = metadata or {}
 
     def build(self, scene, pos):
         build_kernel(scene, pos[0], pos[1], pos[2], self.data)
 
 # --- WFC 3D class ---
 class WaveFunctionCollapse3D:
-    def __init__(self, width, height, depth, block_types, seed=None):
+    def __init__(self, width, height, depth, block_types, seed=None, enforce_ground_constraint=False):
         self.width = width
         self.height = height
         self.depth = depth
         self.block_types = block_types  # List of Block objects
         self.block_types_by_name = {b.name: b for b in block_types}
         self.grid = np.full((width, height, depth), None)  # Collapsed block at each cell
+        self.enforce_ground_constraint = enforce_ground_constraint
         # Store sets of block names instead of Block objects
-        self.possible_blocks = [[[set(self.block_types_by_name.keys()) for _ in range(depth)] for _ in range(height)] for _ in range(width)]
+        self.possible_blocks = []
+        for x in range(width):
+            col = []
+            for y in range(height):
+                row = []
+                for z in range(depth):
+                    if self.enforce_ground_constraint and y == 0:
+                        # Only allow blocks with can_be_ground=True at ground level
+                        allowed = set(
+                            b.name for b in block_types if b.metadata.get('can_be_ground', False)
+                        )
+                    else:
+                        allowed = set(self.block_types_by_name.keys())
+                    row.append(allowed)
+                col.append(row)
+            self.possible_blocks.append(col)
         # Determine block shape from the first block
         if len(block_types) > 0:
             self.block_shape = block_types[0].data.shape[:3]

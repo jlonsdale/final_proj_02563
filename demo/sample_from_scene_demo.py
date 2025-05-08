@@ -139,9 +139,9 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
 # Example usage:
 
 sample_scene = make_sample_scene()
-block_shape = (3, 1, 3)
+block_shape = (2, 2, 2)
 similarity_threshold = 0.99
-neighbor_distance = 0
+neighbor_distance = 2
 material_compatibility_map = {
     frozenset([0, 0]): 1.0,
     frozenset([1, 1]): 1.0,
@@ -151,8 +151,8 @@ material_compatibility_map = {
     frozenset([1, 2]): 0.0,
 }
 seed = 42
-
 allow_repeated_blocks = True  # Set to True to allow repeated blocks, False for unique blocks only
+enforce_ground_constraint = True  # Set to True to enforce ground constraint
 
 extractor = SampleBlockExtractor(
     sample_scene,
@@ -164,7 +164,7 @@ extractor = SampleBlockExtractor(
 )
 block_objects = extractor.get_block_objects()
 print(f"Extracted {len(block_objects)} unique blocks.")
-wfc = WaveFunctionCollapse3D(2, 20, 2, block_objects, seed=seed)
+wfc = WaveFunctionCollapse3D(2, 20, 2, block_objects, seed=seed, enforce_ground_constraint=enforce_ground_constraint)
 
 
 scene = Scene(voxel_edges=0.1, exposure=1)
