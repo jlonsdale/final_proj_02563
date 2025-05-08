@@ -87,7 +87,7 @@ def make_sample_scene_3():
 # open white cube with black edges #
 ####################################
 
-def make_sample_scene_3():
+def make_sample_scene_4():
     arr = np.zeros((5, 5, 5, 4), dtype=np.float32)
     arr[:, :4, :, 0:3] = white
     arr[:, :4, :, 3] = 2
@@ -131,18 +131,19 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
 
 # Example usage:
 
-sample_scene = make_sample_scene_2()
-block_shape = (4, 2, 4)
+sample_scene = make_sample_scene_4()
+block_shape = (2, 2, 2)
 similarity_threshold = 0.99
 neighbor_distance = 1
 material_compatibility_map = {
     frozenset([0, 0]): 1.0,
     frozenset([1, 1]): 1.0,
     frozenset([2, 2]): 1.0,
-    frozenset([0, 1]): 0.5,
+    # frozenset([0, 1]): 0.5,
     frozenset([0, 2]): 1.0,
-    frozenset([1, 2]): 0.0,
+    # frozenset([1, 2]): 0.0,
 }
+seed = 42
 
 extractor = SampleBlockExtractor(
     sample_scene,
@@ -153,7 +154,7 @@ extractor = SampleBlockExtractor(
     )
 block_objects = extractor.get_block_objects()
 print(f"Extracted {len(block_objects)} unique blocks.")
-wfc = WaveFunctionCollapse3D(4, 20, 4, block_objects)
+wfc = WaveFunctionCollapse3D(5, 5, 5, block_objects, seed=seed)
 
 
 scene = Scene(voxel_edges=0.1, exposure=1)

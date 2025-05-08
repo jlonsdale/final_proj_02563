@@ -84,7 +84,7 @@ class WaveFunctionCollapse3D:
                     before = self.possible_blocks[nx][ny][nz]
                     self.possible_blocks[nx][ny][nz] = self.possible_blocks[nx][ny][nz].intersection(allowed_names)
                     after = self.possible_blocks[nx][ny][nz]
-                    if len(after) < len(before):
+                    if len(after) < len(before) and len(after) != 0:
                         stack.append((nx, ny, nz))
 
     def build_scene(self, scene):
