@@ -131,17 +131,17 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
 
 # Example usage:
 
-sample_scene = make_sample_scene_4()
-block_shape = (2, 2, 2)
+sample_scene = make_sample_scene()
+block_shape = (4, 2, 4)
 similarity_threshold = 0.99
-neighbor_distance = 1
+neighbor_distance = 3
 material_compatibility_map = {
     frozenset([0, 0]): 1.0,
     frozenset([1, 1]): 1.0,
     frozenset([2, 2]): 1.0,
-    # frozenset([0, 1]): 0.5,
+    # frozenset([0, 1]): 1.0,
     frozenset([0, 2]): 1.0,
-    # frozenset([1, 2]): 0.0,
+    frozenset([1, 2]): 0.0,
 }
 seed = 42
 
@@ -154,7 +154,7 @@ extractor = SampleBlockExtractor(
     )
 block_objects = extractor.get_block_objects()
 print(f"Extracted {len(block_objects)} unique blocks.")
-wfc = WaveFunctionCollapse3D(5, 5, 5, block_objects, seed=seed)
+wfc = WaveFunctionCollapse3D(2, 20, 2, block_objects, seed=seed)
 
 
 scene = Scene(voxel_edges=0.1, exposure=1)
