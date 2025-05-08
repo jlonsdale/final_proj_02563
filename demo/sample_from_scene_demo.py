@@ -134,7 +134,7 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
 sample_scene = make_sample_scene()
 block_shape = (4, 2, 4)
 similarity_threshold = 0.99
-neighbor_distance = 3
+neighbor_distance = 1
 material_compatibility_map = {
     frozenset([0, 0]): 1.0,
     frozenset([1, 1]): 1.0,
@@ -163,7 +163,14 @@ scene.set_background_color((0.5, 0.5, 0.4))
 scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
 
 # Build block debugger visualization at z=30
-block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, compatibility_map=material_compatibility_map, similarity_threshold=similarity_threshold, base_z=30)
+block_debugger_and_viewer_in_scene(
+    scene,
+    sample_scene,
+    block_shape,
+    compatibility_map=material_compatibility_map,
+    neighbor_distance=neighbor_distance,
+    similarity_threshold=similarity_threshold,
+    base_z=30)
 
 wfc.collapse()
 wfc.build_scene(scene)
