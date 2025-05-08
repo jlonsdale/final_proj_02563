@@ -15,26 +15,43 @@ def build_kernel(scene: ti.template(), x: int, y: int, z: int, data: ti.types.nd
             
 # --- Block class ---
 class Block:
-    def __init__(self, name, data, allowed_neighbors=None):
+    def __init__(self, name, data, allowed_neighbors=None, metadata=None):
         self.name = name
         # data: numpy array of shape (3,3,3,4) with (r,g,b,mat)
         self.data = data.astype(np.float32)
         self.allowed_neighbors = allowed_neighbors or {}
+        self.metadata = metadata or {}
 
     def build(self, scene, pos):
         build_kernel(scene, pos[0], pos[1], pos[2], self.data)
 
 # --- WFC 3D class ---
 class WaveFunctionCollapse3D:
-    def __init__(self, width, height, depth, block_types, seed=None):
+    def __init__(self, width, height, depth, block_types, seed=None, enforce_ground_constraint=False):
         self.width = width
         self.height = height
         self.depth = depth
         self.block_types = block_types  # List of Block objects
         self.block_types_by_name = {b.name: b for b in block_types}
         self.grid = np.full((width, height, depth), None)  # Collapsed block at each cell
+        self.enforce_ground_constraint = enforce_ground_constraint
         # Store sets of block names instead of Block objects
-        self.possible_blocks = [[[set(self.block_types_by_name.keys()) for _ in range(depth)] for _ in range(height)] for _ in range(width)]
+        self.possible_blocks = []
+        for x in range(width):
+            col = []
+            for y in range(height):
+                row = []
+                for z in range(depth):
+                    if self.enforce_ground_constraint and y == 0:
+                        # Only allow blocks with can_be_ground=True at ground level
+                        allowed = set(
+                            b.name for b in block_types if b.metadata.get('can_be_ground', False)
+                        )
+                    else:
+                        allowed = set(self.block_types_by_name.keys())
+                    row.append(allowed)
+                col.append(row)
+            self.possible_blocks.append(col)
         # Determine block shape from the first block
         if len(block_types) > 0:
             self.block_shape = block_types[0].data.shape[:3]
@@ -63,7 +80,7 @@ class WaveFunctionCollapse3D:
 
             x, y, z = min_cell
             options = self.possible_blocks[x][y][z]
-            chosen_name = np.random.choice(list(options))
+            chosen_name = self.rng.choice(sorted(list(options)))
             chosen = self.block_types_by_name[chosen_name]
             self.grid[x, y, z] = chosen
             self.possible_blocks[x][y][z] = {chosen_name}
@@ -78,13 +95,17 @@ class WaveFunctionCollapse3D:
             for dx, dy, dz in directions:
                 nx, ny, nz = cx+dx, cy+dy, cz+dz
                 if 0 <= nx < self.width and 0 <= ny < self.height and 0 <= nz < self.depth and self.grid[nx, ny, nz] is None:
+                    if len(self.possible_blocks[cx][cy][cz]) == 0:
+                        # No options left, this should not 
+                        continue
+                        raise ValueError("No options left for cell ({}, {}, {})".format(cx, cy, cz))
                     allowed_names = set()
                     for block_name in self.possible_blocks[cx][cy][cz]:
                         allowed_names |= set(self.block_types_by_name[block_name].allowed_neighbors.get((dx, dy, dz), []))
                     before = self.possible_blocks[nx][ny][nz]
                     self.possible_blocks[nx][ny][nz] = self.possible_blocks[nx][ny][nz].intersection(allowed_names)
                     after = self.possible_blocks[nx][ny][nz]
-                    if len(after) < len(before):
+                    if len(after) < len(before) and len(after) != 0:
                         stack.append((nx, ny, nz))
 
     def build_scene(self, scene):
@@ -101,4 +122,26 @@ class WaveFunctionCollapse3D:
                     block = self.grid[x, y, z]
                     if block:
                         block.build(scene, (bx*x, by*y, bz*z))
+
+    def save_scene_as_ndarray(self, filename):
+        """
+        Save the current WFC grid as a numpy ndarray of voxel values.
+        The output shape is (width, height, depth, bx, by, bz, 4), where (bx, by, bz) is the block shape.
+        """
+        bx, by, bz = self.block_shape
+        arr = np.zeros((self.width, self.height, self.depth, bx, by, bz, 4), dtype=np.float32)
+        for x in range(self.width):
+            for y in range(self.height):
+                for z in range(self.depth):
+                    block = self.grid[x, y, z]
+                    if block is not None:
+                        arr[x, y, z] = block.data
+        np.save(filename, arr)
+
+    @staticmethod
+    def load_scene_from_ndarray(filename):
+        """
+        Load a WFC scene ndarray from file. Returns the ndarray.
+        """
+        return np.load(filename)
 
