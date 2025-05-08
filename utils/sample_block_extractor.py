@@ -95,6 +95,48 @@ class SampleBlockExtractor:
             raise ValueError("Invalid direction")
         return region
 
+    def _get_block_faces_for_connection(self, block1: np.ndarray, block2: np.ndarray, direction: Tuple[int, int, int]) -> Tuple[np.ndarray, np.ndarray]:
+        """Helper to get the opposing faces of two blocks based on direction."""
+        if direction == (1, 0, 0): # block1 is to the left of block2
+            face1 = block1[-1, :, :, :] # Right face of block1
+            face2 = block2[0, :, :, :]  # Left face of block2
+        elif direction == (-1, 0, 0): # block1 is to the right of block2
+            face1 = block1[0, :, :, :]  # Left face of block1
+            face2 = block2[-1, :, :, :] # Right face of block2
+        elif direction == (0, 1, 0): # block1 is below block2
+            face1 = block1[:, -1, :, :] # Top face of block1
+            face2 = block2[:, 0, :, :]  # Bottom face of block2
+        elif direction == (0, -1, 0): # block1 is above block2
+            face1 = block1[:, 0, :, :]  # Bottom face of block1
+            face2 = block2[:, -1, :, :] # Top face of block2
+        elif direction == (0, 0, 1): # block1 is behind block2
+            face1 = block1[:, :, -1, :] # Front face of block1
+            face2 = block2[:, :, 0, :]  # Back face of block2
+        elif direction == (0, 0, -1): # block1 is in front of block2
+            face1 = block1[:, :, 0, :]  # Back face of block1
+            face2 = block2[:, :, -1, :] # Front face of block2
+        else:
+            raise ValueError(f"Invalid direction for face extraction: {direction}")
+        return face1, face2
+
+    def _get_block_region_for_connection(self, block: np.ndarray, direction: Tuple[int, int, int], n: int) -> np.ndarray:
+        """Helper to get a region of thickness n from a block, corresponding to an incoming connection from 'direction'."""
+        if direction == (1, 0, 0): # Connection comes from left (-x), so take left region of block
+            region = block[:n, :, :, :]
+        elif direction == (-1, 0, 0): # Connection comes from right (+x), so take right region of block
+            region = block[-n:, :, :, :]
+        elif direction == (0, 1, 0): # Connection comes from bottom (-y), so take bottom region of block
+            region = block[:, :n, :, :]
+        elif direction == (0, -1, 0): # Connection comes from top (+y), so take top region of block
+            region = block[:, -n:, :, :]
+        elif direction == (0, 0, 1): # Connection comes from back (-z), so take back region of block
+            region = block[:, :, :n, :]
+        elif direction == (0, 0, -1): # Connection comes from front (+z), so take front region of block
+            region = block[:, :, -n:, :]
+        else:
+            raise ValueError(f"Invalid direction for region extraction from block: {direction}")
+        return region
+
     def _compare_faces_or_regions(self, arr1: np.ndarray, arr2: np.ndarray) -> bool:
         """
         Compare two faces or regions for connectability based on material and color similarity.
@@ -110,8 +152,8 @@ class SampleBlockExtractor:
         mat2 = arr2[..., 3].reshape(-1)
         color1 = arr1[..., :3].reshape(-1, 3)
         color2 = arr2[..., :3].reshape(-1, 3)
-        if mat1.size == 0 or mat2.size == 0:
-            return True
+        if mat1.size == 0 or mat2.size == 0: # It's occurs on the edges of the sample
+            return False
         similarities = []
         for idx, (m1, m2) in enumerate(zip(mat1, mat2)):
             key = frozenset([int(m1), int(m2)])
@@ -130,47 +172,35 @@ class SampleBlockExtractor:
     def _blocks_can_connect(self, idx1: int, idx2: int, direction: Tuple[int, int, int]) -> bool:
         block1 = self.blocks[idx1]
         block2 = self.blocks[idx2]
-        if self.neighbor_distance == 0:
-            if direction == (1, 0, 0):
-                face1 = block1[-1, :, :, :]
-                face2 = block2[0, :, :, :]
-            elif direction == (-1, 0, 0):
-                face1 = block1[0, :, :, :]
-                face2 = block2[-1, :, :, :]
-            elif direction == (0, 1, 0):
-                face1 = block1[:, -1, :, :]
-                face2 = block2[:, 0, :, :]
-            elif direction == (0, -1, 0):
-                face1 = block1[:, 0, :, :]
-                face2 = block2[:, -1, :, :]
-            elif direction == (0, 0, 1):
-                face1 = block1[:, :, -1, :]
-                face2 = block2[:, :, 0, :]
-            elif direction == (0, 0, -1):
-                face1 = block1[:, :, 0, :]
-                face2 = block2[:, :, -1, :]
-            else:
-                raise ValueError("Invalid direction")
-            return self._compare_faces_or_regions(face1, face2)
-        else:
+
+        arr1_to_compare = None
+        arr2_to_compare = None
+        attempt_region_comparison = False
+
+        if self.neighbor_distance > 0:
             n = self.neighbor_distance
             block1_origin = self.block_origins[idx1]
-            region1 = self._get_sample_neighbor_region(block1_origin, direction, n)
-            if direction == (1, 0, 0):
-                region2 = block2[:n, :, :, :]
-            elif direction == (-1, 0, 0):
-                region2 = block2[-n:, :, :, :]
-            elif direction == (0, 1, 0):
-                region2 = block2[:, :n, :, :]
-            elif direction == (0, -1, 0):
-                region2 = block2[:, -n:, :, :]
-            elif direction == (0, 0, 1):
-                region2 = block2[:, :, :n, :]
-            elif direction == (0, 0, -1):
-                region2 = block2[:, :, -n:, :]
-            else:
-                raise ValueError("Invalid direction")
-            return self._compare_faces_or_regions(region1, region2)
+            
+            # _get_sample_neighbor_region is expected to return an empty np.ndarray 
+            # if the requested region is out of bounds of the sample_scene.
+            # It raises ValueError for fundamentally invalid direction tuples, 
+            # but directions from _extract_blocks_and_connections are assumed valid.
+            region1_from_sample = self._get_sample_neighbor_region(block1_origin, direction, n)
+
+            if region1_from_sample.size > 0:
+                # Successfully obtained a non-empty region from the sample scene
+                arr1_to_compare = region1_from_sample
+                arr2_to_compare = self._get_block_region_for_connection(block2, direction, n)
+                attempt_region_comparison = True
+            # If region1_from_sample.size == 0 (edge case), we fall through to face comparison.
+
+        if not attempt_region_comparison:
+            # This block is executed if:
+            # 1. self.neighbor_distance == 0 (initial condition)
+            # 2. self.neighbor_distance > 0 BUT region1_from_sample was empty (edge of scene)
+            arr1_to_compare, arr2_to_compare = self._get_block_faces_for_connection(block1, block2, direction)
+
+        return self._compare_faces_or_regions(arr1_to_compare, arr2_to_compare)
 
     def _hash_block(self, block: np.ndarray) -> int:
         # Use a hash of the bytes for uniqueness
