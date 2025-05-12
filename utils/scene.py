@@ -110,6 +110,7 @@ class Camera:
         return np.cross(self._up, tgtdir)
 
 
+@ti.data_oriented
 class Scene:
     def __init__(self, voxel_edges=0.06, exposure=3):
         ti.init(arch=ti.vulkan)
@@ -145,6 +146,86 @@ class Scene:
     def get_voxel(self, idx):
         mat, color = self.renderer.get_voxel(self.round_idx(idx))
         return mat, color
+
+    @ti.kernel
+    def _copy_data_to_numpy_kernel(self,
+                                   output_array: ti.types.ndarray(),  # type: ignore
+                                   min_b: ti.types.vector(3, ti.i32),
+                                   max_b: ti.types.vector(3, ti.i32)):
+        # Iterate over world coordinates defined by min_b and max_b
+        for i, j, k in ti.ndrange((min_b[0], max_b[0] + 1),
+                                   (min_b[1], max_b[1] + 1),
+                                   (min_b[2], max_b[2] + 1)):
+            # Array indices (relative to min_b)
+            arr_i = i - min_b[0]
+            arr_j = j - min_b[1]
+            arr_k = k - min_b[2]
+
+            mat, color_vec = self.get_voxel(ti.Vector([i, j, k]))
+
+            output_array[arr_i, arr_j, arr_k, 0] = color_vec[0]
+            output_array[arr_i, arr_j, arr_k, 1] = color_vec[1]
+            output_array[arr_i, arr_j, arr_k, 2] = color_vec[2]
+            output_array[arr_i, arr_j, arr_k, 3] = ti.cast(mat, ti.f32)
+
+    def save_scene_to_numpy(self, filepath: str):
+        """
+        Saves the current scene's voxel data to a NumPy .npy file.
+        The data is stored as an array of shape (dim_x, dim_y, dim_z, 4),
+        where the last dimension contains (r, g, b, material_id).
+        """
+        if hasattr(self.renderer, 'recompute_bbox') and callable(self.renderer.recompute_bbox):
+            self.renderer.recompute_bbox()
+        else:
+            print("Warning: Renderer does not have a callable recompute_bbox method. Bounding box might not be up-to-date.")
+
+        if not hasattr(self.renderer, 'bbox'):
+            print("Error: Renderer does not have bbox attribute. Cannot determine scene bounds to save.")
+            return
+
+        # Retrieve Taichi field values into Python-scope Taichi Vector variables
+        world_min_bbox_py_vec = self.renderer.bbox[0]  # Already a ti.Vector in Python scope
+        world_max_bbox_py_vec = self.renderer.bbox[1]  # Already a ti.Vector in Python scope
+        inv_dx_py_float = self.renderer.voxel_inv_dx  # This is a Python float
+
+        # Perform calculations: ti.math.floor on a ti.Vector returns a new ti.Vector.
+        # These operations are on Python-scope ti.Vector objects.
+        kernel_min_b_fvec = ti.math.floor(world_min_bbox_py_vec * inv_dx_py_float)
+        kernel_max_b_fvec = ti.math.floor(world_max_bbox_py_vec * inv_dx_py_float) - 2 # Element-wise subtraction
+
+        # Instead of .cast(ti.i32), convert to Python int lists for kernel
+        kernel_min_b_for_kernel = [int(kernel_min_b_fvec[i]) for i in range(3)]
+        kernel_max_b_for_kernel = [int(kernel_max_b_fvec[i]) for i in range(3)]
+
+        # For Python-scope dimension calculations and printing, use these lists
+        dim_x = kernel_max_b_for_kernel[0] - kernel_min_b_for_kernel[0] + 1
+        dim_y = kernel_max_b_for_kernel[1] - kernel_min_b_for_kernel[1] + 1
+        dim_z = kernel_max_b_for_kernel[2] - kernel_min_b_for_kernel[2] + 1
+
+        if dim_x <= 0 or dim_y <= 0 or dim_z <= 0:
+            world_min_py_list = [float(world_min_bbox_py_vec[i]) for i in range(3)]
+            world_max_py_list = [float(world_max_bbox_py_vec[i]) for i in range(3)]
+            kernel_min_py_list = kernel_min_b_for_kernel
+            kernel_max_py_list = kernel_max_b_for_kernel
+            print(f"Warning: Scene bounding box results in non-positive dimensions. "
+                  f"World Min: {world_min_py_list}, World Max: {world_max_py_list}. "
+                  f"Voxel Index Min: {kernel_min_py_list}, Voxel Index Max: {kernel_max_py_list}. "
+                  f"Calculated Dims: ({dim_x}, {dim_y}, {dim_z}). "
+                  f"Renderer voxel_dx: {self.renderer.voxel_dx}, inv_dx: {inv_dx_py_float}. "
+                  f"Saving an empty array to {filepath}")
+            empty_data_array = np.zeros((0, 0, 0, 4), dtype=np.float32)
+            np.save(filepath, empty_data_array)
+            return
+
+        scene_data_np = np.zeros((dim_x, dim_y, dim_z, 4), dtype=np.float32)
+
+        self._copy_data_to_numpy_kernel(scene_data_np, kernel_min_b_for_kernel, kernel_max_b_for_kernel)
+
+        try:
+            np.save(filepath, scene_data_np)
+            print(f"Scene data saved to {filepath} with shape {scene_data_np.shape}")
+        except Exception as e:
+            print(f"Error saving scene to {filepath}: {e}")
 
     def set_floor(self, height, color):
         self.renderer.floor_height[None] = height

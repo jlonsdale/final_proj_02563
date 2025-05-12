@@ -138,8 +138,9 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similar
 
 # Example usage:
 
-sample_scene = make_sample_scene()
-block_shape = (1, 1, 1)
+# sample_scene = make_sample_scene()
+sample_scene = np.load("example_castle_scene.npy")
+block_shape = (2, 2, 2)
 similarity_threshold = 0.99
 neighbor_distance = 1
 material_compatibility_map = {
@@ -151,7 +152,7 @@ material_compatibility_map = {
     frozenset([1, 2]): 0.0,
 }
 seed = 42
-allow_repeated_blocks = True  # Set to True to allow repeated blocks, False for unique blocks only
+allow_repeated_blocks = False  # Set to True to allow repeated blocks, False for unique blocks only
 enforce_ground_constraint = True  # Set to True to enforce ground constraint
 
 extractor = SampleBlockExtractor(
@@ -163,6 +164,7 @@ extractor = SampleBlockExtractor(
     allow_repeated_blocks=allow_repeated_blocks,
 )
 block_objects = extractor.get_block_objects()
+extractor.save_block_objects("blocks.json")
 print(f"Extracted {len(block_objects)} unique blocks.")
 wfc = WaveFunctionCollapse3D(4, 20, 4, block_objects, seed=seed, enforce_ground_constraint=enforce_ground_constraint)
 

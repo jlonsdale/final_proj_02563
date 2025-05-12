@@ -200,4 +200,5 @@ def initialize():
     create_tower(base + ivec3(4, 0, 7), 2, 14, 7)  # Left tower touches left wing
 
 initialize()
+scene.save_scene_to_numpy("example_castle_scene.npy") # Save the scene
 scene.finish()

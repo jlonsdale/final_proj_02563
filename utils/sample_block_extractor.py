@@ -3,6 +3,12 @@ import numpy as np
 from typing import Tuple, List, Dict
 from collections import defaultdict
 from wfc import Block
+import sys
+try:
+    from tqdm import tqdm
+    _TQDM_AVAILABLE = True
+except ImportError:
+    _TQDM_AVAILABLE = False
 
 class SampleBlockExtractor:
     def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None, allow_repeated_blocks: bool = False):
@@ -42,13 +48,18 @@ class SampleBlockExtractor:
         A, B, C, _ = self.sample_scene.shape
         Nx, Ny, Nz = self.block_shape
         block_map = {}
-        for i in range(A - Nx + 1):
+        total_blocks = (A - Nx + 1) * (B - Ny + 1) * (C - Nz + 1)
+        block_iter = (
+            tqdm(range(A - Nx + 1), desc='Extracting blocks', file=sys.stdout)
+            if _TQDM_AVAILABLE else range(A - Nx + 1)
+        )
+        block_counter = 0
+        for i in block_iter:
             for j in range(B - Ny + 1):
                 for k in range(C - Nz + 1):
                     block = self.sample_scene[i:i+Nx, j:j+Ny, k:k+Nz, :].copy()
                     block_hash = self._hash_block(block)
                     if self.allow_repeated_blocks:
-                        # Always add the block, even if identical
                         idx = len(self.blocks)
                         self.blocks.append(block)
                         self.block_origins.append((i, j, k))
@@ -59,6 +70,9 @@ class SampleBlockExtractor:
                             self.blocks.append(block)
                             self.block_origins.append((i, j, k))
                         block_map[(i, j, k)] = self.block_indices[block_hash]
+                    block_counter += 1
+                    if not _TQDM_AVAILABLE and block_counter % 1000 == 0:
+                        print(f"Extracted {block_counter}/{total_blocks} blocks...")
         # Now, infer connections
         directions = [
             (1, 0, 0),  # +x (east)
@@ -68,21 +82,18 @@ class SampleBlockExtractor:
             (0, 0, 1),  # +z (south)
             (0, 0, -1), # -z (north)
         ]
-        # 1. Add neighbors from the sample
-        for (i, j, k), idx in block_map.items():
-            for d, (dx, dy, dz) in enumerate(directions):
-                ni, nj, nk = i + dx, j + dy, k + dz
-                if (ni, nj, nk) in block_map:
-                    idx2 = block_map[(ni, nj, nk)]
-                    if self._blocks_can_connect(idx, idx2, (dx, dy, dz)):
-                        self.allowed_neighbors[idx][(dx, dy, dz)].add(idx2)
-        # 2. For each block, check all possible connections in all directions
         num_blocks = len(self.blocks)
-        for idx1 in range(num_blocks):
+        neighbor_iter = (
+            tqdm(range(num_blocks), desc='Inferring connections', file=sys.stdout)
+            if _TQDM_AVAILABLE else range(num_blocks)
+        )
+        for idx1 in neighbor_iter:
             for d, direction in enumerate(directions):
                 for idx2 in range(num_blocks):
                     if self._blocks_can_connect(idx1, idx2, direction):
                         self.allowed_neighbors[idx1][direction].add(idx2)
+        if not _TQDM_AVAILABLE:
+            print("Finished inferring connections.")
 
     def _get_sample_neighbor_region(self, block_origin, direction, n):
         # Returns the region of the sample_scene that was adjacent to the block at block_origin in direction, thickness n
@@ -247,6 +258,23 @@ class SampleBlockExtractor:
                 metadata['can_be_ground'] = False
             block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata))
         return block_objects
+
+    def save_block_objects(self, filename):
+        """
+        Save the block objects (as dicts) to a numpy file for later loading.
+        """
+        block_objects = self.get_block_objects()
+        # Convert Block objects to dicts for serialization
+        block_dicts = []
+        for block in block_objects:
+            block_dicts.append({
+                'name': block.name,
+                'block_data': block.data,
+                'allowed_neighbors': block.allowed_neighbors,
+                'metadata': block.metadata
+            })
+        np.save(filename, block_dicts)
+        print(f"Saved {len(block_dicts)} block objects to {filename}")
 
     @staticmethod
     def from_saved_scene(filename, block_shape, similarity_threshold=0.95, neighbor_distance=0, material_compatibility_map=None, allow_repeated_blocks=False):
