@@ -7,6 +7,7 @@ import json
 import os
 from tqdm import tqdm
 import ast
+from line_profiler import profile
 
 class SampleBlockExtractor:
     def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None, allow_repeated_blocks: bool = False):
@@ -42,6 +43,7 @@ class SampleBlockExtractor:
             self.material_compatibility_map = {frozenset(k): v for k, v in material_compatibility_map.items()}
         self._extract_blocks_and_connections()
 
+    @profile
     def _extract_blocks_and_connections(self):
         A, B, C, _ = self.sample_scene.shape
         Nx, Ny, Nz = self.block_shape
@@ -56,12 +58,14 @@ class SampleBlockExtractor:
                         self.blocks.append(block)
                         self.block_origins.append((i, j, k))
                         block_map[(i, j, k)] = idx
+                        self.block_count_by_index[idx] += 1
                     else:
                         if block_hash not in self.block_indices:
                             self.block_indices[block_hash] = len(self.blocks)
                             self.blocks.append(block)
                             self.block_origins.append((i, j, k))
                         block_map[(i, j, k)] = self.block_indices[block_hash]
+                        self.block_count_by_index[self.block_indices[block_hash]] += 1
         # Now, infer connections
         directions = [
             (1, 0, 0),  # +x (east)
@@ -149,6 +153,7 @@ class SampleBlockExtractor:
             raise ValueError(f"Invalid direction for region extraction from block: {direction}")
         return region
 
+    @profile
     def _compare_faces_or_regions(self, arr1: np.ndarray, arr2: np.ndarray) -> bool:
         """
         Compare two faces or regions for connectability based on material and color similarity.
@@ -181,6 +186,7 @@ class SampleBlockExtractor:
         avg_similarity = np.mean(similarities)
         return avg_similarity >= self.similarity_threshold
 
+    @profile
     def _blocks_can_connect(self, idx1: int, idx2: int, direction: Tuple[int, int, int]) -> bool:
         block1 = self.blocks[idx1]
         block2 = self.blocks[idx2]

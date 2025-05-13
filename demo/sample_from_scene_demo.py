@@ -120,8 +120,8 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_
         block.build(scene, base_pos)
         # Build all possible neighbors in all directions, stacking them vertically
         stack_y = 1
-        for direction, neighbor_names in block.allowed_neighbors.items():
-            print(f"Building neighbors for {block.name} in direction {direction}: {neighbor_names}")
+        # for direction, neighbor_names in block.allowed_neighbors.items():
+        #     print(f"Building neighbors for {block.name} in direction {direction}: {neighbor_names}")
             # for neighbor_name in neighbor_names:
             #     neighbor_block = name_to_block[neighbor_name]
             #     neighbor_pos = (base_pos[0], base_pos[1] + stack_y * (block_shape[1] + 1), base_pos[2])

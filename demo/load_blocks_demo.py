@@ -11,14 +11,14 @@ from scene import Scene
 
 if __name__ == '__main__':
     # Load block objects from blocks.json.np
-    block_objects = load_block_objects('blocks_8.json')
+    block_objects = load_block_objects('blocks_9.json')
     print(f"Loaded {len(block_objects)} unique blocks from blocks.json.npy.")
 
     # Optionally, load a sample scene for visualization (if needed)
     sample_scene = np.load("example_castle_scene.npy")
 
     # Create a WFC instance
-    wfc = WaveFunctionCollapse3D(2, 3, 2, block_objects, seed=42, enforce_ground_constraint=True)
+    wfc = WaveFunctionCollapse3D(2, 1, 2, block_objects, seed=42, enforce_ground_constraint=True)
 
     # Create and configure the scene
     scene = Scene(voxel_edges=0.1, exposure=1)
