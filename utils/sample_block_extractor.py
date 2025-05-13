@@ -169,20 +169,22 @@ class SampleBlockExtractor:
         mat2 = arr2[..., 3].reshape(-1)
         color1 = arr1[..., :3].reshape(-1, 3)
         color2 = arr2[..., :3].reshape(-1, 3)
-        if mat1.size == 0 or mat2.size == 0: # It's occurs on the edges of the sample
+        if mat1.size == 0 or mat2.size == 0:
             return False
-        similarities = []
-        for idx, (m1, m2) in enumerate(zip(mat1, mat2)):
-            key = frozenset([int(m1), int(m2)])
-            compat = self.material_compatibility_map.get(key, 0.0)
-            norm1 = np.linalg.norm(color1[idx])
-            norm2 = np.linalg.norm(color2[idx])
-            if norm1 == 0 or norm2 == 0:
-                cos_sim = 1.0 # Treat zero vectors as identical
-            else:
-                cos_sim = np.dot(color1[idx]/norm1, color2[idx]/norm2)
-            combined_sim = compat * cos_sim
-            similarities.append(combined_sim)
+
+        # Vectorized material compatibility lookup
+        keys = [frozenset([int(m1), int(m2)]) for m1, m2 in zip(mat1, mat2)]
+        compats = np.array([self.material_compatibility_map.get(k, 0.0) for k in keys])
+
+        # Vectorized cosine similarity
+        norm1 = np.linalg.norm(color1, axis=1)
+        norm2 = np.linalg.norm(color2, axis=1)
+        mask = (norm1 != 0) & (norm2 != 0)
+        cos_sim = np.ones_like(norm1)
+        # Only compute dot for nonzero vectors
+        cos_sim[mask] = np.einsum('ij,ij->i', color1[mask]/norm1[mask, None], color2[mask]/norm2[mask, None])
+
+        similarities = compats * cos_sim
         avg_similarity = np.mean(similarities)
         return avg_similarity >= self.similarity_threshold
 
