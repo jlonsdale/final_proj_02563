@@ -102,39 +102,58 @@ def make_sample_scene_4():
 
 
 #call this function to visualize the blocks and their neighbors in the same scene
-def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_z=30):
-    """
-    Visualize blocks and their neighbors in the given scene at a specified z position.
-    """
+def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_z=30, pad: int = 2):
     if callable(sample_scene):
         sample_scene = sample_scene()
-    print(f"Extracted {len(block_objects)} unique blocks.")
-    block_shape = block_objects[0].data.shape
-    # Visualize the original sample scene at the origin, but at base_z
-    build_kernel(scene, 0, 0, base_z + 10, sample_scene)
-    # Build a mapping from block name to block object for easy lookup
-    name_to_block = {block.name: block for block in block_objects}
-    # Visualize all blocks in the scene, spaced apart
+
+    block_size = block_objects[0].data.shape
+    build_kernel(scene, 0, 0, base_z + 20, sample_scene)
+
+    name_to_block = {b.name: b for b in block_objects}
+
+    offsets = {
+        (1, 0, 0): (block_size[0] + pad, 0, 0),    # east
+        (-1, 0, 0): (-(block_size[0] + pad), 0, 0), # west
+        (0, 1, 0): (0, block_size[1] + pad, 0),     # up
+        (0, -1, 0): (0, -(block_size[1] + pad), 0), # down
+        (0, 0, 1): (0, 0, block_size[2] + pad),     # south
+        (0, 0, -1): (0, 0, -(block_size[2] + pad)), # north
+    }
+
+    stride = (block_size[0] + pad) * 4
+
     for i, block in enumerate(block_objects):
-        base_pos = ((i - 9) * (block_shape[0] + 1), 0, base_z - 5)
-        block.build(scene, base_pos)
-        # Build all possible neighbors in all directions, stacking them vertically
-        stack_y = 1
-        # for direction, neighbor_names in block.allowed_neighbors.items():
-        #     print(f"Building neighbors for {block.name} in direction {direction}: {neighbor_names}")
-            # for neighbor_name in neighbor_names:
-            #     neighbor_block = name_to_block[neighbor_name]
-            #     neighbor_pos = (base_pos[0], base_pos[1] + stack_y * (block_shape[1] + 1), base_pos[2])
-            #     neighbor_block.build(scene, neighbor_pos)
-            #     stack_y += 1
+        origin = ((i - len(block_objects) // 2) * stride, len(block.allowed_neighbors[(0, -1, 0)]) * offsets[(0, 1, 0)][1], base_z)
+        block.build(scene, origin)
+
+        for direction, neighbors in block.allowed_neighbors.items():
+            off = offsets.get(direction)
+            if off is None:
+                continue
+
+            for n_idx, neighbor_name in enumerate(neighbors):
+                neighbor_block = name_to_block[neighbor_name]
+
+                if direction in ((0, 1, 0), (0, -1, 0)):
+                    stack = (0, (n_idx) * (block_size[2] + pad), 0 )
+                else:
+                    stack = (0, (n_idx) * (block_size[1] + pad), 0)
+
+                pos = (
+                    origin[0] + off[0] + stack[0],
+                    origin[1] + off[1] + stack[1],
+                    origin[2] + off[2] + stack[2],
+                )
+
+                neighbor_block.build(scene, pos)
 
 if __name__ == '__main__':
     # Example usage:
     sample_scene = make_sample_scene()
     # sample_scene = np.load("example_castle_scene.npy")
-    block_shape = (3, 3, 3)
+    block_shape = (4, 2, 4)
     similarity_threshold = 0.90
-    neighbor_distance = 2
+    neighbor_distance = 1
     material_compatibility_map = {
         frozenset([0, 0]): 1.0,
         frozenset([1, 1]): 1.0,
@@ -170,7 +189,7 @@ if __name__ == '__main__':
         scene,
         sample_scene,
         block_objects,
-        base_z=30)
+        base_z=40)
 
     wfc.collapse()
     wfc.build_scene(scene)
