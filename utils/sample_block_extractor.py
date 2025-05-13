@@ -48,8 +48,8 @@ class SampleBlockExtractor:
         A, B, C, _ = self.sample_scene.shape
         Nx, Ny, Nz = self.block_shape
         block_map = {}
-        for i in range(A - Nx + 1):
-            for j in range(B - Ny + 1):
+        for j in range(B - Ny + 1):
+            for i in range(A - Nx + 1):
                 for k in range(C - Nz + 1):
                     block = self.sample_scene[i:i+Nx, j:j+Ny, k:k+Nz, :].copy()
                     block_hash = self._hash_block(block)

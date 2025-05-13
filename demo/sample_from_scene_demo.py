@@ -130,17 +130,17 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_
 
 if __name__ == '__main__':
     # Example usage:
-    # sample_scene = make_sample_scene()
-    sample_scene = np.load("example_castle_scene.npy")
-    block_shape = (1, 1, 1)
-    similarity_threshold = 0.5
-    neighbor_distance = 1
+    sample_scene = make_sample_scene()
+    # sample_scene = np.load("example_castle_scene.npy")
+    block_shape = (3, 3, 3)
+    similarity_threshold = 0.90
+    neighbor_distance = 2
     material_compatibility_map = {
         frozenset([0, 0]): 1.0,
         frozenset([1, 1]): 1.0,
         frozenset([2, 2]): 1.0,
-        frozenset([0, 1]): 1.0,
-        frozenset([0, 2]): 1.0,
+        # frozenset([0, 1]): 0.5,
+        # frozenset([0, 2]): 1.0,
         frozenset([1, 2]): 0.0,
     }
     seed = 42
