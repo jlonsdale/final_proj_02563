@@ -109,6 +109,17 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_
     block_size = block_objects[0].data.shape
     build_kernel(scene, 0, 0, base_z + 20, sample_scene)
 
+    # Limit the number of blocks to a reasonable value (e.g., 8)
+    max_blocks = 8  # 2x2x2=8, fits well in 128 voxels
+    if len(block_objects) > max_blocks:
+        import random
+        random.seed(42)  # for reproducibility
+        sampled_blocks = random.sample(block_objects, max_blocks)
+        sampled_names = set(b.name for b in sampled_blocks)
+        block_objects = sampled_blocks
+    else:
+        sampled_names = set(b.name for b in block_objects)
+
     name_to_block = {b.name: b for b in block_objects}
 
     offsets = {
@@ -131,7 +142,10 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_
             if off is None:
                 continue
 
-            for n_idx, neighbor_name in enumerate(neighbors):
+            # Only include neighbors that are in the sampled set
+            filtered_neighbors = [neighbor_name for neighbor_name in neighbors if neighbor_name in sampled_names]
+
+            for n_idx, neighbor_name in enumerate(filtered_neighbors):
                 neighbor_block = name_to_block[neighbor_name]
 
                 if direction in ((0, 1, 0), (0, -1, 0)):
@@ -150,7 +164,8 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_
 if __name__ == '__main__':
     # Example usage:
     sample_scene = make_sample_scene()
-    # sample_scene = np.load("example_castle_scene.npy")
+    # sample_scene = np.load("example_castle_scene_3.npy")
+    print(f"Sample scene shape: {sample_scene.shape}")
     block_shape = (4, 2, 4)
     similarity_threshold = 0.90
     neighbor_distance = 1
@@ -159,7 +174,7 @@ if __name__ == '__main__':
         frozenset([1, 1]): 1.0,
         frozenset([2, 2]): 1.0,
         # frozenset([0, 1]): 0.5,
-        # frozenset([0, 2]): 1.0,
+        frozenset([0, 2]): 1.0,
         frozenset([1, 2]): 0.0,
     }
     seed = 42
@@ -177,7 +192,7 @@ if __name__ == '__main__':
     block_objects = extractor.get_block_objects()
     extractor.save_block_objects("blocks.json")
     print(f"Extracted {len(block_objects)} unique blocks.")
-    wfc = WaveFunctionCollapse3D(4, 20, 4, block_objects, seed=seed, enforce_ground_constraint=enforce_ground_constraint)
+    wfc = WaveFunctionCollapse3D(4, 2, 4, block_objects, seed=seed, enforce_ground_constraint=enforce_ground_constraint)
 
     scene = Scene(voxel_edges=0.1, exposure=1)
     scene.set_floor(0, (1.0, 1.0, 1.0))
