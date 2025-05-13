@@ -4,22 +4,83 @@ from typing import Tuple, List, Dict
 from collections import defaultdict
 from wfc import Block
 import sys
+import json
+import os
+
 try:
     from tqdm import tqdm
     _TQDM_AVAILABLE = True
 except ImportError:
     _TQDM_AVAILABLE = False
 
+def check_connections_for_block(args):
+    idx1, block_faces, face_hash_map, directions, blocks, block_origins, neighbor_distance, similarity_threshold, material_compatibility_map = args
+    from collections import defaultdict
+
+    local_allowed = defaultdict(set)
+    for d in directions:
+        face1 = block_faces[d][idx1]
+        face_hash = hash(face1.tobytes())
+        candidate_indices = face_hash_map[d][face_hash]
+        for idx2 in candidate_indices:
+            block1 = blocks[idx1]
+            block2 = blocks[idx2]
+            arr1_to_compare = None
+            arr2_to_compare = None
+            attempt_region_comparison = False
+            if neighbor_distance > 0:
+                n = neighbor_distance
+                block1_origin = block_origins[idx1]
+            if not attempt_region_comparison:
+                if d == (1, 0, 0):
+                    arr1_to_compare = block1[-1, :, :, :]
+                    arr2_to_compare = block2[0, :, :, :]
+                elif d == (-1, 0, 0):
+                    arr1_to_compare = block1[0, :, :, :]
+                    arr2_to_compare = block2[-1, :, :, :]
+                elif d == (0, 1, 0):
+                    arr1_to_compare = block1[:, -1, :, :]
+                    arr2_to_compare = block2[:, 0, :, :]
+                elif d == (0, -1, 0):
+                    arr1_to_compare = block1[:, 0, :, :]
+                    arr2_to_compare = block2[:, -1, :, :]
+                elif d == (0, 0, 1):
+                    arr1_to_compare = block1[:, :, -1, :]
+                    arr2_to_compare = block2[:, :, 0, :]
+                elif d == (0, 0, -1):
+                    arr1_to_compare = block1[:, :, 0, :]
+                    arr2_to_compare = block2[:, :, -1, :]
+            arr1 = arr1_to_compare
+            arr2 = arr2_to_compare
+            if arr1.shape != arr2.shape:
+                min_shape = np.minimum(arr1.shape, arr2.shape)
+                arr1 = arr1[tuple(slice(0, s) for s in min_shape)]
+                arr2 = arr2[tuple(slice(0, s) for s in min_shape)]
+            mat1 = arr1[..., 3].reshape(-1)
+            mat2 = arr2[..., 3].reshape(-1)
+            color1 = arr1[..., :3].reshape(-1, 3)
+            color2 = arr2[..., :3].reshape(-1, 3)
+            if mat1.size == 0 or mat2.size == 0:
+                continue
+            similarities = []
+            for idx, (m1, m2) in enumerate(zip(mat1, mat2)):
+                key = frozenset([int(m1), int(m2)])
+                compat = material_compatibility_map.get(key, 0.0)
+                norm1 = np.linalg.norm(color1[idx])
+                norm2 = np.linalg.norm(color2[idx])
+                if norm1 == 0 or norm2 == 0:
+                    cos_sim = 1.0
+                else:
+                    cos_sim = np.dot(color1[idx]/norm1, color2[idx]/norm2)
+                combined_sim = compat * cos_sim
+                similarities.append(combined_sim)
+            avg_similarity = np.mean(similarities)
+            if avg_similarity >= similarity_threshold:
+                local_allowed[d].add(idx2)
+    return idx1, local_allowed
+
 class SampleBlockExtractor:
     def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None, allow_repeated_blocks: bool = False):
-        """
-        sample_scene: (A, B, C, 4) numpy array
-        block_shape: (Nx, Ny, Nz)
-        similarity_threshold: threshold for average cosine similarity to consider two block faces connectable
-        neighbor_distance: distance to consider for neighbor connections
-        material_compatibility_map: dict mapping frozenset({mat1, mat2}) -> float in [0,1] for material compatibility
-        allow_repeated_blocks: if True, blocks are not required to be unique (can repeat)
-        """
         self.sample_scene = sample_scene
         self.block_shape = block_shape
         self.similarity_threshold = similarity_threshold
@@ -29,6 +90,7 @@ class SampleBlockExtractor:
         self.block_indices = {}  # Map from block hash to index in self.blocks
         self.allowed_neighbors = defaultdict(lambda: defaultdict(set))  # block_idx -> direction -> set(block_idx)
         self.block_origins = []  # Store the origin of each block in the sample
+        self.block_count_by_index = defaultdict(int)  # Count of blocks by index
         if material_compatibility_map is None:
             # By default, air (0) matches with light (2) and block (1) with 1.0
             self.material_compatibility_map = {
@@ -40,11 +102,11 @@ class SampleBlockExtractor:
                 frozenset([1, 2]): 0.0,
             }
         else:
-            # Convert all keys to frozenset for safety
             self.material_compatibility_map = {frozenset(k): v for k, v in material_compatibility_map.items()}
         self._extract_blocks_and_connections()
 
     def _extract_blocks_and_connections(self):
+        import concurrent.futures
         A, B, C, _ = self.sample_scene.shape
         Nx, Ny, Nz = self.block_shape
         block_map = {}
@@ -64,16 +126,17 @@ class SampleBlockExtractor:
                         self.blocks.append(block)
                         self.block_origins.append((i, j, k))
                         block_map[(i, j, k)] = idx
+                        self.block_count_by_index[idx] += 1
                     else:
                         if block_hash not in self.block_indices:
                             self.block_indices[block_hash] = len(self.blocks)
                             self.blocks.append(block)
                             self.block_origins.append((i, j, k))
                         block_map[(i, j, k)] = self.block_indices[block_hash]
+                        self.block_count_by_index[self.block_indices[block_hash]] += 1
                     block_counter += 1
                     if not _TQDM_AVAILABLE and block_counter % 1000 == 0:
                         print(f"Extracted {block_counter}/{total_blocks} blocks...")
-        # Now, infer connections
         directions = [
             (1, 0, 0),  # +x (east)
             (-1, 0, 0), # -x (west)
@@ -83,20 +146,47 @@ class SampleBlockExtractor:
             (0, 0, -1), # -z (north)
         ]
         num_blocks = len(self.blocks)
+        face_hash_map = {d: defaultdict(set) for d in directions}
+        block_faces = {d: [] for d in directions}
+        for idx, block in enumerate(self.blocks):
+            for d in directions:
+                face, _ = self._get_block_faces_for_connection(block, block, d)
+                face_hash = hash(face.tobytes())
+                face_hash_map[d][face_hash].add(idx)
+                block_faces[d].append(face)
         neighbor_iter = (
             tqdm(range(num_blocks), desc='Inferring connections', file=sys.stdout)
             if _TQDM_AVAILABLE else range(num_blocks)
         )
-        for idx1 in neighbor_iter:
-            for d, direction in enumerate(directions):
-                for idx2 in range(num_blocks):
-                    if self._blocks_can_connect(idx1, idx2, direction):
-                        self.allowed_neighbors[idx1][direction].add(idx2)
-        if not _TQDM_AVAILABLE:
+        args_list = [
+            (
+                idx1,
+                block_faces,
+                face_hash_map,
+                directions,
+                self.blocks,
+                self.block_origins,
+                self.neighbor_distance,
+                self.similarity_threshold,
+                self.material_compatibility_map
+            ) for idx1 in range(num_blocks)
+        ]
+        results = []
+        if _TQDM_AVAILABLE:
+            pbar = tqdm(total=num_blocks, desc='Inferring connections', file=sys.stdout)
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            for res in executor.map(check_connections_for_block, args_list, chunksize=8):
+                idx1, local_allowed = res
+                for d, idx2s in local_allowed.items():
+                    self.allowed_neighbors[idx1][d].update(idx2s)
+                if _TQDM_AVAILABLE:
+                    pbar.update(1)
+        if _TQDM_AVAILABLE:
+            pbar.close()
+        else:
             print("Finished inferring connections.")
 
     def _get_sample_neighbor_region(self, block_origin, direction, n):
-        # Returns the region of the sample_scene that was adjacent to the block at block_origin in direction, thickness n
         i, j, k = block_origin
         Nx, Ny, Nz = self.block_shape
         if direction == (1, 0, 0):
@@ -164,7 +254,6 @@ class SampleBlockExtractor:
         Uses material_compatibility_map for material matching.
         """
         if arr1.shape != arr2.shape:
-            # resize the the biggest one to the smallest one
             min_shape = np.minimum(arr1.shape, arr2.shape)
             arr1 = arr1[tuple(slice(0, s) for s in min_shape)]
             arr2 = arr2[tuple(slice(0, s) for s in min_shape)]
@@ -172,7 +261,7 @@ class SampleBlockExtractor:
         mat2 = arr2[..., 3].reshape(-1)
         color1 = arr1[..., :3].reshape(-1, 3)
         color2 = arr2[..., :3].reshape(-1, 3)
-        if mat1.size == 0 or mat2.size == 0: # It's occurs on the edges of the sample
+        if mat1.size == 0 or mat2.size == 0:
             return False
         similarities = []
         for idx, (m1, m2) in enumerate(zip(mat1, mat2)):
@@ -200,37 +289,25 @@ class SampleBlockExtractor:
         if self.neighbor_distance > 0:
             n = self.neighbor_distance
             block1_origin = self.block_origins[idx1]
-            
-            # _get_sample_neighbor_region is expected to return an empty np.ndarray 
-            # if the requested region is out of bounds of the sample_scene.
-            # It raises ValueError for fundamentally invalid direction tuples, 
-            # but directions from _extract_blocks_and_connections are assumed valid.
             region1_from_sample = self._get_sample_neighbor_region(block1_origin, direction, n)
 
             if region1_from_sample.size > 0:
-                # Successfully obtained a non-empty region from the sample scene
                 arr1_to_compare = region1_from_sample
                 arr2_to_compare = self._get_block_region_for_connection(block2, direction, n)
                 attempt_region_comparison = True
-            # If region1_from_sample.size == 0 (edge case), we fall through to face comparison.
 
         if not attempt_region_comparison:
-            # This block is executed if:
-            # 1. self.neighbor_distance == 0 (initial condition)
-            # 2. self.neighbor_distance > 0 BUT region1_from_sample was empty (edge of scene)
             arr1_to_compare, arr2_to_compare = self._get_block_faces_for_connection(block1, block2, direction)
 
         return self._compare_faces_or_regions(arr1_to_compare, arr2_to_compare)
 
     def _hash_block(self, block: np.ndarray) -> int:
-        # Use a hash of the bytes for uniqueness
         return hash(block.tobytes())
 
     def get_blocks(self) -> List[np.ndarray]:
         return self.blocks
 
     def get_allowed_neighbors(self) -> Dict[int, Dict[Tuple[int, int, int], List[int]]]:
-        # Convert sets to lists for easier use
         return {idx: {d: list(neighs) for d, neighs in dirs.items()} for idx, dirs in self.allowed_neighbors.items()}
 
     def get_block_objects(self):
@@ -244,37 +321,45 @@ class SampleBlockExtractor:
         for idx, block_data in enumerate(self.blocks):
             name = idx_to_name[idx]
             neighbors = allowed_neighbors.get(idx, {})
-            # Map neighbor indices to names for each direction
             neighbors_named = {
                 direction: [idx_to_name[n_idx] for n_idx in neighbor_indices]
                 for direction, neighbor_indices in neighbors.items()
             }
-            # Add can_be_ground metadata if block origin y==0
             origin = self.block_origins[idx]
             metadata = {}
             if origin[1] == 0:
                 metadata['can_be_ground'] = True
             else:
                 metadata['can_be_ground'] = False
-            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata))
+            weight = self.block_count_by_index[idx] / len(self.blocks) if not self.allow_repeated_blocks else 1.0
+            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata, weight=weight))
         return block_objects
 
     def save_block_objects(self, filename):
         """
         Save the block objects (as dicts) to a numpy file for later loading.
+        If a file with the same name exists, append a number to the filename.
         """
+        import os
+        base, ext = os.path.splitext(filename)
+        counter = 1
+        new_filename = filename
+        while os.path.exists(new_filename):
+            new_filename = f"{base}_{counter}{ext}"
+            counter += 1
         block_objects = self.get_block_objects()
-        # Convert Block objects to dicts for serialization
         block_dicts = []
         for block in block_objects:
             block_dicts.append({
-                'name': block.name,
-                'block_data': block.data,
-                'allowed_neighbors': block.allowed_neighbors,
-                'metadata': block.metadata
+            'name': block.name,
+            'block_data': block.data.tolist(),  # convert numpy array to list for JSON serialization
+            'allowed_neighbors': block.allowed_neighbors,
+            'metadata': block.metadata,
+            'weight': block.weight
             })
-        np.save(filename, block_dicts)
-        print(f"Saved {len(block_dicts)} block objects to {filename}")
+        with open(new_filename, 'w') as f:
+            json.dump(block_dicts, f)
+        print(f"Saved {len(block_dicts)} block objects to {new_filename}")
 
     @staticmethod
     def from_saved_scene(filename, block_shape, similarity_threshold=0.95, neighbor_distance=0, material_compatibility_map=None, allow_repeated_blocks=False):
@@ -292,7 +377,30 @@ class SampleBlockExtractor:
         )
 
 
-
+def load_block_objects(filename):
+    """
+    Load block objects from a JSON or NPY file saved by save_block_objects.
+    Returns a list of Block objects.
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    block_objects = []
+    if ext == ".json":
+        with open(filename, 'r') as f:
+            block_dicts = json.load(f)
+    elif ext == ".npy":
+        block_dicts = np.load(filename, allow_pickle=True)
+        if hasattr(block_dicts, 'tolist'):
+            block_dicts = block_dicts.tolist()
+    else:
+        raise ValueError("Unsupported file extension: {}".format(ext))
+    for block_dict in block_dicts:
+        name = block_dict['name']
+        data = np.array(block_dict['block_data'])
+        allowed_neighbors = block_dict['allowed_neighbors']
+        metadata = block_dict.get('metadata', {})
+        weight = block_dict.get('weight', 1.0)
+        block_objects.append(Block(name, data, allowed_neighbors=allowed_neighbors, metadata=metadata, weight=weight))
+    return block_objects
 
 
 
