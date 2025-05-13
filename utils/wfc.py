@@ -15,12 +15,13 @@ def build_kernel(scene: ti.template(), x: int, y: int, z: int, data: ti.types.nd
             
 # --- Block class ---
 class Block:
-    def __init__(self, name, data, allowed_neighbors=None, metadata=None):
+    def __init__(self, name, data, allowed_neighbors=None, metadata=None, weight=1.0):
         self.name = name
         # data: numpy array of shape (3,3,3,4) with (r,g,b,mat)
         self.data = data.astype(np.float32)
         self.allowed_neighbors = allowed_neighbors or {}
         self.metadata = metadata or {}
+        self.weight = weight
 
     def build(self, scene, pos):
         build_kernel(scene, pos[0], pos[1], pos[2], self.data)
@@ -60,31 +61,24 @@ class WaveFunctionCollapse3D:
         self.rng = np.random.default_rng(seed)
 
     def collapse(self):
-        # Collapse the cell with the lowest entropy (smallest number of options)
-        while True:
-            min_options = float('inf')
-            min_cell = None
-
+        # Collapse cells in top-to-bottom, left-to-right, front-to-back order
+        for y in range(self.height):
             for x in range(self.width):
-                for y in range(self.height):
-                    for z in range(self.depth):
-                        if self.grid[x, y, z] is None:
-                            options = self.possible_blocks[x][y][z]
-                            if 0 < len(options) < min_options:
-                                min_options = len(options)
-                                min_cell = (x, y, z)
-
-            if min_cell is None:
-                # All cells are collapsed
-                break
-
-            x, y, z = min_cell
-            options = self.possible_blocks[x][y][z]
-            chosen_name = self.rng.choice(sorted(list(options)))
-            chosen = self.block_types_by_name[chosen_name]
-            self.grid[x, y, z] = chosen
-            self.possible_blocks[x][y][z] = {chosen_name}
-            self.propagate(x, y, z)
+                for z in range(self.depth):
+                    if self.grid[x, y, z] is None:
+                        options = self.possible_blocks[x][y][z]
+                        if not options:
+                            continue  # No options left, skip (or could raise error)
+                        option_names = sorted(list(options))
+                        option_blocks = [self.block_types_by_name[name] for name in option_names]
+                        weights = [b.weight for b in option_blocks]
+                        weights = np.array(weights, dtype=np.float32)
+                        weights = weights / weights.sum() if weights.sum() > 0 else np.ones_like(weights) / len(weights)
+                        chosen_name = self.rng.choice(option_names, p=weights)
+                        chosen = self.block_types_by_name[chosen_name]
+                        self.grid[x, y, z] = chosen
+                        self.possible_blocks[x][y][z] = {chosen_name}
+                        self.propagate(x, y, z)
 
     def propagate(self, x, y, z):
         # Stack-based propagation: propagate constraints until no more changes

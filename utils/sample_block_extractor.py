@@ -3,6 +3,8 @@ import numpy as np
 from typing import Tuple, List, Dict
 from collections import defaultdict
 from wfc import Block
+import json
+import os
 
 class SampleBlockExtractor:
     def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None, allow_repeated_blocks: bool = False):
@@ -23,6 +25,7 @@ class SampleBlockExtractor:
         self.block_indices = {}  # Map from block hash to index in self.blocks
         self.allowed_neighbors = defaultdict(lambda: defaultdict(set))  # block_idx -> direction -> set(block_idx)
         self.block_origins = []  # Store the origin of each block in the sample
+        self.block_count_by_index = defaultdict(int)  # Count of blocks by index
         if material_compatibility_map is None:
             # By default, air (0) matches with light (2) and block (1) with 1.0
             self.material_compatibility_map = {
@@ -34,7 +37,6 @@ class SampleBlockExtractor:
                 frozenset([1, 2]): 0.0,
             }
         else:
-            # Convert all keys to frozenset for safety
             self.material_compatibility_map = {frozenset(k): v for k, v in material_compatibility_map.items()}
         self._extract_blocks_and_connections()
 
@@ -48,7 +50,6 @@ class SampleBlockExtractor:
                     block = self.sample_scene[i:i+Nx, j:j+Ny, k:k+Nz, :].copy()
                     block_hash = self._hash_block(block)
                     if self.allow_repeated_blocks:
-                        # Always add the block, even if identical
                         idx = len(self.blocks)
                         self.blocks.append(block)
                         self.block_origins.append((i, j, k))
@@ -68,15 +69,6 @@ class SampleBlockExtractor:
             (0, 0, 1),  # +z (south)
             (0, 0, -1), # -z (north)
         ]
-        # 1. Add neighbors from the sample
-        for (i, j, k), idx in block_map.items():
-            for d, (dx, dy, dz) in enumerate(directions):
-                ni, nj, nk = i + dx, j + dy, k + dz
-                if (ni, nj, nk) in block_map:
-                    idx2 = block_map[(ni, nj, nk)]
-                    if self._blocks_can_connect(idx, idx2, (dx, dy, dz)):
-                        self.allowed_neighbors[idx][(dx, dy, dz)].add(idx2)
-        # 2. For each block, check all possible connections in all directions
         num_blocks = len(self.blocks)
         for idx1 in range(num_blocks):
             for d, direction in enumerate(directions):
@@ -245,8 +237,35 @@ class SampleBlockExtractor:
                 metadata['can_be_ground'] = True
             else:
                 metadata['can_be_ground'] = False
-            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata))
+            weight = self.block_count_by_index[idx] if not self.allow_repeated_blocks else 1.0
+            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata, weight=weight))
         return block_objects
+
+    def save_block_objects(self, filename):
+        """
+        Save the block objects (as dicts) to a numpy file for later loading.
+        If a file with the same name exists, append a number to the filename.
+        """
+        import os
+        base, ext = os.path.splitext(filename)
+        counter = 1
+        new_filename = filename
+        while os.path.exists(new_filename):
+            new_filename = f"{base}_{counter}{ext}"
+            counter += 1
+        block_objects = self.get_block_objects()
+        block_dicts = []
+        for block in block_objects:
+            block_dicts.append({
+            'name': block.name,
+            'block_data': block.data.tolist(),  # convert numpy array to list for JSON serialization
+            'allowed_neighbors': block.allowed_neighbors,
+            'metadata': block.metadata,
+            'weight': block.weight
+            })
+        with open(new_filename, 'w') as f:
+            json.dump(block_dicts, f)
+        print(f"Saved {len(block_dicts)} block objects to {new_filename}")
 
     @staticmethod
     def from_saved_scene(filename, block_shape, similarity_threshold=0.95, neighbor_distance=0, material_compatibility_map=None, allow_repeated_blocks=False):
@@ -264,7 +283,30 @@ class SampleBlockExtractor:
         )
 
 
-
+def load_block_objects(filename):
+    """
+    Load block objects from a JSON or NPY file saved by save_block_objects.
+    Returns a list of Block objects.
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    block_objects = []
+    if ext == ".json":
+        with open(filename, 'r') as f:
+            block_dicts = json.load(f)
+    elif ext == ".npy":
+        block_dicts = np.load(filename, allow_pickle=True)
+        if hasattr(block_dicts, 'tolist'):
+            block_dicts = block_dicts.tolist()
+    else:
+        raise ValueError("Unsupported file extension: {}".format(ext))
+    for block_dict in block_dicts:
+        name = block_dict['name']
+        data = np.array(block_dict['block_data'])
+        allowed_neighbors = block_dict['allowed_neighbors']
+        metadata = block_dict.get('metadata', {})
+        weight = block_dict.get('weight', 1.0)
+        block_objects.append(Block(name, data, allowed_neighbors=allowed_neighbors, metadata=metadata, weight=weight))
+    return block_objects
 
 
 
