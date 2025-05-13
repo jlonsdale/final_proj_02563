@@ -132,7 +132,7 @@ if __name__ == '__main__':
     # Example usage:
     # sample_scene = make_sample_scene()
     sample_scene = np.load("example_castle_scene.npy")
-    block_shape = (2, 2, 2)
+    block_shape = (1, 1, 1)
     similarity_threshold = 0.5
     neighbor_distance = 1
     material_compatibility_map = {

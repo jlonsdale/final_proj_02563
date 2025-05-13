@@ -6,6 +6,7 @@ from wfc import Block
 import json
 import os
 from tqdm import tqdm
+import ast
 
 class SampleBlockExtractor:
     def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None, allow_repeated_blocks: bool = False):
@@ -266,12 +267,14 @@ class SampleBlockExtractor:
         block_objects = self.get_block_objects()
         block_dicts = []
         for block in block_objects:
+            # Convert tuple keys in allowed_neighbors to strings
+            allowed_neighbors_str = {str(k): v for k, v in block.allowed_neighbors.items()}
             block_dicts.append({
-            'name': block.name,
-            'block_data': block.data.tolist(),  # convert numpy array to list for JSON serialization
-            'allowed_neighbors': block.allowed_neighbors,
-            'metadata': block.metadata,
-            'weight': block.weight
+                'name': block.name,
+                'block_data': block.data.tolist(),  # convert numpy array to list for JSON serialization
+                'allowed_neighbors': allowed_neighbors_str,
+                'metadata': block.metadata,
+                'weight': block.weight
             })
         with open(new_filename, 'w') as f:
             json.dump(block_dicts, f)
@@ -298,6 +301,7 @@ def load_block_objects(filename):
     Load block objects from a JSON or NPY file saved by save_block_objects.
     Returns a list of Block objects.
     """
+    import ast
     ext = os.path.splitext(filename)[1].lower()
     block_objects = []
     if ext == ".json":
@@ -313,9 +317,11 @@ def load_block_objects(filename):
         name = block_dict['name']
         data = np.array(block_dict['block_data'])
         allowed_neighbors = block_dict['allowed_neighbors']
+        # Convert string keys back to tuple
+        allowed_neighbors_tuple = {ast.literal_eval(k): v for k, v in allowed_neighbors.items()}
         metadata = block_dict.get('metadata', {})
         weight = block_dict.get('weight', 1.0)
-        block_objects.append(Block(name, data, allowed_neighbors=allowed_neighbors, metadata=metadata, weight=weight))
+        block_objects.append(Block(name, data, allowed_neighbors=allowed_neighbors_tuple, metadata=metadata, weight=weight))
     return block_objects
 
 
