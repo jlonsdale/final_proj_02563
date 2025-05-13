@@ -5,6 +5,7 @@ from collections import defaultdict
 from wfc import Block
 import json
 import os
+from tqdm import tqdm
 
 class SampleBlockExtractor:
     def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None, allow_repeated_blocks: bool = False):
@@ -70,11 +71,20 @@ class SampleBlockExtractor:
             (0, 0, -1), # -z (north)
         ]
         num_blocks = len(self.blocks)
-        for idx1 in range(num_blocks):
+        for idx1 in tqdm(range(num_blocks)):
             for d, direction in enumerate(directions):
-                for idx2 in range(num_blocks):
+                # Only check each unordered pair once per direction
+                for idx2 in range(idx1, num_blocks):
+                    # Check if already allowed (either direction)
+                    if idx2 in self.allowed_neighbors[idx1][direction]:
+                        continue
+                    # Compute the opposite direction
+                    opp_direction = tuple(-x for x in direction)
+                    if idx1 in self.allowed_neighbors[idx2][opp_direction]:
+                        raise ValueError(f"Duplicate connection found between blocks {idx1} and {idx2} in direction {opp_direction}")
                     if self._blocks_can_connect(idx1, idx2, direction):
                         self.allowed_neighbors[idx1][direction].add(idx2)
+                        self.allowed_neighbors[idx2][opp_direction].add(idx1)
 
     def _get_sample_neighbor_region(self, block_origin, direction, n):
         # Returns the region of the sample_scene that was adjacent to the block at block_origin in direction, thickness n
