@@ -164,7 +164,7 @@ def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_
 if __name__ == '__main__':
     # Example usage:
     sample_scene = make_sample_scene()
-    # sample_scene = np.load("example_castle_scene_3.npy")
+    # sample_scene = np.load("samples/example_castle_scene_3.npy")
     print(f"Sample scene shape: {sample_scene.shape}")
     block_shape = (4, 2, 4)
     similarity_threshold = 0.90
@@ -190,7 +190,7 @@ if __name__ == '__main__':
         allow_repeated_blocks=allow_repeated_blocks,
     )
     block_objects = extractor.get_block_objects()
-    extractor.save_block_objects("blocks.json")
+    extractor.save_block_objects("extractions/blocks.json")
     print(f"Extracted {len(block_objects)} unique blocks.")
     wfc = WaveFunctionCollapse3D(4, 2, 4, block_objects, seed=seed, enforce_ground_constraint=enforce_ground_constraint)
 

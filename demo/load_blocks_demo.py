@@ -11,11 +11,11 @@ from scene import Scene
 from sample_from_scene_demo import *
 if __name__ == '__main__':
     # Load block objects from blocks.json.np
-    block_objects = load_block_objects('sample_sceen_air_math_light.json')
+    block_objects = load_block_objects('extractions/sample_sceen_air_math_light.json')
     print(f"Loaded {len(block_objects)} unique blocks from blocks.json.npy.")
 
     # Optionally, load a sample scene for visualization (if needed)
-    sample_scene = np.load("example_castle_scene_3.npy")
+    sample_scene = np.load("samples/example_castle_scene_3.npy")
     sample_scene = make_sample_scene()
     print(f"Sample scene shape: {sample_scene.shape}")
     wfc_size = (2,2,2)
