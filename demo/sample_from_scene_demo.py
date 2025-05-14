@@ -102,87 +102,110 @@ def make_sample_scene_4():
 
 
 #call this function to visualize the blocks and their neighbors in the same scene
-def block_debugger_and_viewer_in_scene(scene, sample_scene, block_shape, similarity_threshold=0.99, neighbor_distance=1, compatibility_map=None, base_z=30, allow_repeated_blocks=False):
-    """
-    Visualize blocks and their neighbors in the given scene at a specified z position.
-    """
+def block_debugger_and_viewer_in_scene(scene, sample_scene, block_objects, base_z=30, pad: int = 2):
     if callable(sample_scene):
         sample_scene = sample_scene()
+
+    block_size = block_objects[0].data.shape
+    build_kernel(scene, 0, 0, base_z + 20, sample_scene)
+
+    # Limit the number of blocks to a reasonable value (e.g., 8)
+    max_blocks = 8  # 2x2x2=8, fits well in 128 voxels
+    if len(block_objects) > max_blocks:
+        import random
+        random.seed(42)  # for reproducibility
+        sampled_blocks = random.sample(block_objects, max_blocks)
+        sampled_names = set(b.name for b in sampled_blocks)
+        block_objects = sampled_blocks
+    else:
+        sampled_names = set(b.name for b in block_objects)
+
+    name_to_block = {b.name: b for b in block_objects}
+
+    offsets = {
+        (1, 0, 0): (block_size[0] + pad, 0, 0),    # east
+        (-1, 0, 0): (-(block_size[0] + pad), 0, 0), # west
+        (0, 1, 0): (0, block_size[1] + pad, 0),     # up
+        (0, -1, 0): (0, -(block_size[1] + pad), 0), # down
+        (0, 0, 1): (0, 0, block_size[2] + pad),     # south
+        (0, 0, -1): (0, 0, -(block_size[2] + pad)), # north
+    }
+
+    stride = (block_size[0] + pad) * 4
+
+    for i, block in enumerate(block_objects):
+        origin = ((i - len(block_objects) // 2) * stride, len(block.allowed_neighbors[(0, -1, 0)]) * offsets[(0, 1, 0)][1], base_z)
+        block.build(scene, origin)
+
+        for direction, neighbors in block.allowed_neighbors.items():
+            off = offsets.get(direction)
+            if off is None:
+                continue
+
+            # Only include neighbors that are in the sampled set
+            filtered_neighbors = [neighbor_name for neighbor_name in neighbors if neighbor_name in sampled_names]
+
+            for n_idx, neighbor_name in enumerate(filtered_neighbors):
+                neighbor_block = name_to_block[neighbor_name]
+
+                if direction in ((0, 1, 0), (0, -1, 0)):
+                    stack = (0, (n_idx) * (block_size[2] + pad), 0 )
+                else:
+                    stack = (0, (n_idx) * (block_size[1] + pad), 0)
+
+                pos = (
+                    origin[0] + off[0] + stack[0],
+                    origin[1] + off[1] + stack[1],
+                    origin[2] + off[2] + stack[2],
+                )
+
+                neighbor_block.build(scene, pos)
+
+if __name__ == '__main__':
+    # Example usage:
+    sample_scene = make_sample_scene()
+    # sample_scene = np.load("example_castle_scene_3.npy")
+    print(f"Sample scene shape: {sample_scene.shape}")
+    block_shape = (4, 2, 4)
+    similarity_threshold = 0.90
+    neighbor_distance = 1
+    material_compatibility_map = {
+        frozenset([0, 0]): 1.0,
+        frozenset([1, 1]): 1.0,
+        frozenset([2, 2]): 1.0,
+        # frozenset([0, 1]): 0.5,
+        frozenset([0, 2]): 1.0,
+        frozenset([1, 2]): 0.0,
+    }
+    seed = 42
+    allow_repeated_blocks = False  # Set to True to allow repeated blocks, False for unique blocks only
+    enforce_ground_constraint = True  # Set to True to enforce ground constraint
+
     extractor = SampleBlockExtractor(
         sample_scene,
         block_shape,
         similarity_threshold=similarity_threshold,
         neighbor_distance=neighbor_distance,
-        material_compatibility_map=compatibility_map,
+        material_compatibility_map=material_compatibility_map,
         allow_repeated_blocks=allow_repeated_blocks,
     )
     block_objects = extractor.get_block_objects()
+    extractor.save_block_objects("blocks.json")
     print(f"Extracted {len(block_objects)} unique blocks.")
-    # Visualize the original sample scene at the origin, but at base_z
-    build_kernel(scene, 0, 0, base_z + 10, sample_scene)
-    # Build a mapping from block name to block object for easy lookup
-    name_to_block = {block.name: block for block in block_objects}
-    # Visualize all blocks in the scene, spaced apart
-    for i, block in enumerate(block_objects):
-        base_pos = ((i - 9) * (block_shape[0] + 1), 0, base_z - 5)
-        block.build(scene, base_pos)
-        # Build all possible neighbors in all directions, stacking them vertically
-        stack_y = 1
-        for direction, neighbor_names in block.allowed_neighbors.items():
-            print(f"Building neighbors for {block.name} in direction {direction}: {neighbor_names}")
-            # for neighbor_name in neighbor_names:
-            #     neighbor_block = name_to_block[neighbor_name]
-            #     neighbor_pos = (base_pos[0], base_pos[1] + stack_y * (block_shape[1] + 1), base_pos[2])
-            #     neighbor_block.build(scene, neighbor_pos)
-            #     stack_y += 1
+    wfc = WaveFunctionCollapse3D(4, 2, 4, block_objects, seed=seed, enforce_ground_constraint=enforce_ground_constraint)
 
-# Example usage:
+    scene = Scene(voxel_edges=0.1, exposure=1)
+    scene.set_floor(0, (1.0, 1.0, 1.0))
+    scene.set_background_color((0.5, 0.5, 0.4))
+    scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
 
-sample_scene = make_sample_scene()
-block_shape = (2, 2, 2)
-similarity_threshold = 0.99
-neighbor_distance = 0
-material_compatibility_map = {
-    frozenset([0, 0]): 1.0,
-    frozenset([1, 1]): 1.0,
-    frozenset([2, 2]): 1.0,
-    # frozenset([0, 1]): 1.0,
-    # frozenset([0, 2]): 1.0,
-    frozenset([1, 2]): 0.0,
-}
-seed = 42
-allow_repeated_blocks = True  # Set to True to allow repeated blocks, False for unique blocks only
-enforce_ground_constraint = True  # Set to True to enforce ground constraint
+    # Build block debugger visualization at z=30
+    block_debugger_and_viewer_in_scene(
+        scene,
+        sample_scene,
+        block_objects,
+        base_z=40)
 
-extractor = SampleBlockExtractor(
-    sample_scene,
-    block_shape,
-    similarity_threshold=similarity_threshold,
-    neighbor_distance=neighbor_distance,
-    material_compatibility_map=material_compatibility_map,
-    allow_repeated_blocks=allow_repeated_blocks,
-)
-block_objects = extractor.get_block_objects()
-print(f"Extracted {len(block_objects)} unique blocks.")
-wfc = WaveFunctionCollapse3D(2, 20, 2, block_objects, seed=seed, enforce_ground_constraint=enforce_ground_constraint)
-
-
-scene = Scene(voxel_edges=0.1, exposure=1)
-scene.set_floor(0, (1.0, 1.0, 1.0))
-scene.set_background_color((0.5, 0.5, 0.4))
-scene.set_directional_light((1, 1, -1), 0.1, (1, 0.8, 0.6))
-
-# Build block debugger visualization at z=30
-block_debugger_and_viewer_in_scene(
-    scene,
-    sample_scene,
-    block_shape,
-    compatibility_map=material_compatibility_map,
-    neighbor_distance=neighbor_distance,
-    similarity_threshold=similarity_threshold,
-    base_z=30,
-    allow_repeated_blocks=allow_repeated_blocks)
-
-wfc.collapse()
-wfc.build_scene(scene)
-scene.finish()
+    wfc.collapse()
+    wfc.build_scene(scene)
+    scene.finish()

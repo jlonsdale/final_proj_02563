@@ -1,6 +1,7 @@
 import taichi as ti
 import numpy as np
 from taichi.math import vec3, ivec3
+from tqdm import tqdm 
 
 @ti.kernel
 def build_kernel(scene: ti.template(), x: int, y: int, z: int, data: ti.types.ndarray()):
@@ -12,15 +13,19 @@ def build_kernel(scene: ti.template(), x: int, y: int, z: int, data: ti.types.nd
         mat = int(data[i, j, k, 3])
         if mat != 0:
             scene.set_voxel(ivec3(x + i, y + j, z + k), mat, vec3(r, g, b))
+        #debug air blocks
+        # if mat == 0:
+        #     scene.set_voxel(ivec3(x + i, y + j, z + k), 1, vec3(0.5, 0.5, 0.5))
             
 # --- Block class ---
 class Block:
-    def __init__(self, name, data, allowed_neighbors=None, metadata=None):
+    def __init__(self, name, data, allowed_neighbors=None, metadata=None, weight=1.0):
         self.name = name
         # data: numpy array of shape (3,3,3,4) with (r,g,b,mat)
         self.data = data.astype(np.float32)
         self.allowed_neighbors = allowed_neighbors or {}
         self.metadata = metadata or {}
+        self.weight = weight
 
     def build(self, scene, pos):
         build_kernel(scene, pos[0], pos[1], pos[2], self.data)
@@ -35,6 +40,9 @@ class WaveFunctionCollapse3D:
         self.block_types_by_name = {b.name: b for b in block_types}
         self.grid = np.full((width, height, depth), None)  # Collapsed block at each cell
         self.enforce_ground_constraint = enforce_ground_constraint
+        self._directions = [
+            (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)
+        ]
         # Store sets of block names instead of Block objects
         self.possible_blocks = []
         for x in range(width):
@@ -60,52 +68,56 @@ class WaveFunctionCollapse3D:
         self.rng = np.random.default_rng(seed)
 
     def collapse(self):
-        # Collapse the cell with the lowest entropy (smallest number of options)
-        while True:
-            min_options = float('inf')
-            min_cell = None
-
-            for x in range(self.width):
-                for y in range(self.height):
-                    for z in range(self.depth):
-                        if self.grid[x, y, z] is None:
-                            options = self.possible_blocks[x][y][z]
-                            if 0 < len(options) < min_options:
-                                min_options = len(options)
-                                min_cell = (x, y, z)
-
-            if min_cell is None:
-                # All cells are collapsed
-                break
-
-            x, y, z = min_cell
-            options = self.possible_blocks[x][y][z]
-            chosen_name = self.rng.choice(sorted(list(options)))
-            chosen = self.block_types_by_name[chosen_name]
-            self.grid[x, y, z] = chosen
-            self.possible_blocks[x][y][z] = {chosen_name}
-            self.propagate(x, y, z)
+        # Collapse cells in top-to-bottom, left-to-right, front-to-back order
+        for y in tqdm(range(self.height)):
+            for x in tqdm(range(self.width)):
+                for z in tqdm(range(self.depth)):
+                    if self.grid[x, y, z] is None:
+                        options = self.possible_blocks[x][y][z]
+                        if not options:
+                            continue  # No options left, skip (or could raise error)
+                        if len(options) == 1:
+                            chosen_name = next(iter(options))
+                        else:
+                            option_names = sorted(list(options))
+                            option_blocks = [self.block_types_by_name[name] for name in option_names]
+                            weights = [b.weight for b in option_blocks]
+                            # Fast path: if all weights are equal, use uniform choice
+                            if all(w == weights[0] for w in weights):
+                                chosen_name = self.rng.choice(option_names)
+                            else:
+                                weights = np.array(weights, dtype=np.float32)
+                                total = weights.sum()
+                                if total > 0:
+                                    weights = weights / total
+                                else:
+                                    weights = np.ones_like(weights) / len(weights)
+                                chosen_name = self.rng.choice(option_names, p=weights)
+                        chosen = self.block_types_by_name[chosen_name]
+                        self.grid[x, y, z] = chosen
+                        self.possible_blocks[x][y][z] = {chosen_name}
+                        self.propagate(x, y, z)
 
     def propagate(self, x, y, z):
         # Stack-based propagation: propagate constraints until no more changes
         stack = [(x, y, z)]
-        directions = [(-1,0,0),(1,0,0),(0,-1,0),(0,1,0),(0,0,-1),(0,0,1)]
         while stack:
             cx, cy, cz = stack.pop()
-            for dx, dy, dz in directions:
+            for dx, dy, dz in self._directions:  # assume self._directions is precomputed in __init__
                 nx, ny, nz = cx+dx, cy+dy, cz+dz
                 if 0 <= nx < self.width and 0 <= ny < self.height and 0 <= nz < self.depth and self.grid[nx, ny, nz] is None:
-                    if len(self.possible_blocks[cx][cy][cz]) == 0:
-                        # No options left, this should not 
+                    current_options = self.possible_blocks[cx][cy][cz]
+                    if not current_options:
                         continue
-                        raise ValueError("No options left for cell ({}, {}, {})".format(cx, cy, cz))
                     allowed_names = set()
-                    for block_name in self.possible_blocks[cx][cy][cz]:
-                        allowed_names |= set(self.block_types_by_name[block_name].allowed_neighbors.get((dx, dy, dz), []))
-                    before = self.possible_blocks[nx][ny][nz]
-                    self.possible_blocks[nx][ny][nz] = self.possible_blocks[nx][ny][nz].intersection(allowed_names)
-                    after = self.possible_blocks[nx][ny][nz]
-                    if len(after) < len(before) and len(after) != 0:
+                    for block_name in current_options:
+                        allowed_names.update(self.block_types_by_name[block_name].allowed_neighbors.get((dx, dy, dz), []))
+                    if not allowed_names:
+                        continue
+                    neighbor_options = self.possible_blocks[nx][ny][nz]
+                    before_len = len(neighbor_options)
+                    neighbor_options.intersection_update(allowed_names)
+                    if 0 < len(neighbor_options) < before_len:
                         stack.append((nx, ny, nz))
 
     def build_scene(self, scene):

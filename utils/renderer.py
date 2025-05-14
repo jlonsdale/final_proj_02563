@@ -5,7 +5,7 @@ from math_utils import (eps, inf, out_dir, ray_aabb_intersection)
 MAX_RAY_DEPTH = 4
 use_directional_light = True
 
-DIS_LIMIT = 100
+DIS_LIMIT = 150
 
 
 @ti.data_oriented
@@ -46,7 +46,7 @@ class Renderer:
         self.voxel_dx = dx
         self.voxel_inv_dx = 1 / dx
         # Note that voxel_inv_dx == voxel_grid_res iff the box has width = 1
-        self.voxel_grid_res = 128
+        self.voxel_grid_res = 256
         voxel_grid_offset = [-self.voxel_grid_res // 2 for _ in range(3)]
 
         ti.root.dense(ti.ij, image_res).place(self.color_buffer)

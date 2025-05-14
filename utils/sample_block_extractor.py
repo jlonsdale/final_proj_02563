@@ -3,6 +3,11 @@ import numpy as np
 from typing import Tuple, List, Dict
 from collections import defaultdict
 from wfc import Block
+import json
+import os
+from tqdm import tqdm
+import ast
+from line_profiler import profile
 
 class SampleBlockExtractor:
     def __init__(self, sample_scene: np.ndarray, block_shape: Tuple[int, int, int], similarity_threshold: float = 0.95, neighbor_distance: int = 0, material_compatibility_map: Dict[frozenset, float] = None, allow_repeated_blocks: bool = False):
@@ -23,6 +28,7 @@ class SampleBlockExtractor:
         self.block_indices = {}  # Map from block hash to index in self.blocks
         self.allowed_neighbors = defaultdict(lambda: defaultdict(set))  # block_idx -> direction -> set(block_idx)
         self.block_origins = []  # Store the origin of each block in the sample
+        self.block_count_by_index = defaultdict(int)  # Count of blocks by index
         if material_compatibility_map is None:
             # By default, air (0) matches with light (2) and block (1) with 1.0
             self.material_compatibility_map = {
@@ -34,31 +40,32 @@ class SampleBlockExtractor:
                 frozenset([1, 2]): 0.0,
             }
         else:
-            # Convert all keys to frozenset for safety
             self.material_compatibility_map = {frozenset(k): v for k, v in material_compatibility_map.items()}
         self._extract_blocks_and_connections()
 
+    @profile
     def _extract_blocks_and_connections(self):
         A, B, C, _ = self.sample_scene.shape
         Nx, Ny, Nz = self.block_shape
         block_map = {}
-        for i in range(A - Nx + 1):
-            for j in range(B - Ny + 1):
+        for j in range(B - Ny + 1):
+            for i in range(A - Nx + 1):
                 for k in range(C - Nz + 1):
                     block = self.sample_scene[i:i+Nx, j:j+Ny, k:k+Nz, :].copy()
                     block_hash = self._hash_block(block)
                     if self.allow_repeated_blocks:
-                        # Always add the block, even if identical
                         idx = len(self.blocks)
                         self.blocks.append(block)
                         self.block_origins.append((i, j, k))
                         block_map[(i, j, k)] = idx
+                        self.block_count_by_index[idx] += 1
                     else:
                         if block_hash not in self.block_indices:
                             self.block_indices[block_hash] = len(self.blocks)
                             self.blocks.append(block)
                             self.block_origins.append((i, j, k))
                         block_map[(i, j, k)] = self.block_indices[block_hash]
+                        self.block_count_by_index[self.block_indices[block_hash]] += 1
         # Now, infer connections
         directions = [
             (1, 0, 0),  # +x (east)
@@ -68,21 +75,21 @@ class SampleBlockExtractor:
             (0, 0, 1),  # +z (south)
             (0, 0, -1), # -z (north)
         ]
-        # 1. Add neighbors from the sample
-        for (i, j, k), idx in block_map.items():
-            for d, (dx, dy, dz) in enumerate(directions):
-                ni, nj, nk = i + dx, j + dy, k + dz
-                if (ni, nj, nk) in block_map:
-                    idx2 = block_map[(ni, nj, nk)]
-                    if self._blocks_can_connect(idx, idx2, (dx, dy, dz)):
-                        self.allowed_neighbors[idx][(dx, dy, dz)].add(idx2)
-        # 2. For each block, check all possible connections in all directions
         num_blocks = len(self.blocks)
-        for idx1 in range(num_blocks):
+        for idx1 in tqdm(range(num_blocks)):
             for d, direction in enumerate(directions):
-                for idx2 in range(num_blocks):
+                # Only check each unordered pair once per direction
+                for idx2 in range(idx1, num_blocks):
+                    # Check if already allowed (either direction)
+                    if idx2 in self.allowed_neighbors[idx1][direction]:
+                        continue
+                    # Compute the opposite direction
+                    opp_direction = tuple(-x for x in direction)
+                    if idx1 in self.allowed_neighbors[idx2][opp_direction]:
+                        raise ValueError(f"Duplicate connection found between blocks {idx1} and {idx2} in direction {opp_direction}")
                     if self._blocks_can_connect(idx1, idx2, direction):
                         self.allowed_neighbors[idx1][direction].add(idx2)
+                        self.allowed_neighbors[idx2][opp_direction].add(idx1)
 
     def _get_sample_neighbor_region(self, block_origin, direction, n):
         # Returns the region of the sample_scene that was adjacent to the block at block_origin in direction, thickness n
@@ -146,6 +153,7 @@ class SampleBlockExtractor:
             raise ValueError(f"Invalid direction for region extraction from block: {direction}")
         return region
 
+    @profile
     def _compare_faces_or_regions(self, arr1: np.ndarray, arr2: np.ndarray) -> bool:
         """
         Compare two faces or regions for connectability based on material and color similarity.
@@ -161,23 +169,26 @@ class SampleBlockExtractor:
         mat2 = arr2[..., 3].reshape(-1)
         color1 = arr1[..., :3].reshape(-1, 3)
         color2 = arr2[..., :3].reshape(-1, 3)
-        if mat1.size == 0 or mat2.size == 0: # It's occurs on the edges of the sample
+        if mat1.size == 0 or mat2.size == 0:
             return False
-        similarities = []
-        for idx, (m1, m2) in enumerate(zip(mat1, mat2)):
-            key = frozenset([int(m1), int(m2)])
-            compat = self.material_compatibility_map.get(key, 0.0)
-            norm1 = np.linalg.norm(color1[idx])
-            norm2 = np.linalg.norm(color2[idx])
-            if norm1 == 0 or norm2 == 0:
-                cos_sim = 1.0 # Treat zero vectors as identical
-            else:
-                cos_sim = np.dot(color1[idx]/norm1, color2[idx]/norm2)
-            combined_sim = compat * cos_sim
-            similarities.append(combined_sim)
+
+        # Vectorized material compatibility lookup
+        keys = [frozenset([int(m1), int(m2)]) for m1, m2 in zip(mat1, mat2)]
+        compats = np.array([self.material_compatibility_map.get(k, 0.0) for k in keys])
+
+        # Vectorized cosine similarity
+        norm1 = np.linalg.norm(color1, axis=1)
+        norm2 = np.linalg.norm(color2, axis=1)
+        mask = (norm1 != 0) & (norm2 != 0)
+        cos_sim = np.ones_like(norm1)
+        # Only compute dot for nonzero vectors
+        cos_sim[mask] = np.einsum('ij,ij->i', color1[mask]/norm1[mask, None], color2[mask]/norm2[mask, None])
+
+        similarities = compats * cos_sim
         avg_similarity = np.mean(similarities)
         return avg_similarity >= self.similarity_threshold
 
+    @profile
     def _blocks_can_connect(self, idx1: int, idx2: int, direction: Tuple[int, int, int]) -> bool:
         block1 = self.blocks[idx1]
         block2 = self.blocks[idx2]
@@ -245,8 +256,37 @@ class SampleBlockExtractor:
                 metadata['can_be_ground'] = True
             else:
                 metadata['can_be_ground'] = False
-            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata))
+            weight = self.block_count_by_index[idx] if not self.allow_repeated_blocks else 1.0
+            block_objects.append(Block(name, block_data, allowed_neighbors=neighbors_named, metadata=metadata, weight=weight))
         return block_objects
+
+    def save_block_objects(self, filename):
+        """
+        Save the block objects (as dicts) to a numpy file for later loading.
+        If a file with the same name exists, append a number to the filename.
+        """
+        import os
+        base, ext = os.path.splitext(filename)
+        counter = 1
+        new_filename = filename
+        while os.path.exists(new_filename):
+            new_filename = f"{base}_{counter}{ext}"
+            counter += 1
+        block_objects = self.get_block_objects()
+        block_dicts = []
+        for block in block_objects:
+            # Convert tuple keys in allowed_neighbors to strings
+            allowed_neighbors_str = {str(k): v for k, v in block.allowed_neighbors.items()}
+            block_dicts.append({
+                'name': block.name,
+                'block_data': block.data.tolist(),  # convert numpy array to list for JSON serialization
+                'allowed_neighbors': allowed_neighbors_str,
+                'metadata': block.metadata,
+                'weight': block.weight
+            })
+        with open(new_filename, 'w') as f:
+            json.dump(block_dicts, f)
+        print(f"Saved {len(block_dicts)} block objects to {new_filename}")
 
     @staticmethod
     def from_saved_scene(filename, block_shape, similarity_threshold=0.95, neighbor_distance=0, material_compatibility_map=None, allow_repeated_blocks=False):
@@ -264,7 +304,33 @@ class SampleBlockExtractor:
         )
 
 
-
+def load_block_objects(filename):
+    """
+    Load block objects from a JSON or NPY file saved by save_block_objects.
+    Returns a list of Block objects.
+    """
+    import ast
+    ext = os.path.splitext(filename)[1].lower()
+    block_objects = []
+    if ext == ".json":
+        with open(filename, 'r') as f:
+            block_dicts = json.load(f)
+    elif ext == ".npy":
+        block_dicts = np.load(filename, allow_pickle=True)
+        if hasattr(block_dicts, 'tolist'):
+            block_dicts = block_dicts.tolist()
+    else:
+        raise ValueError("Unsupported file extension: {}".format(ext))
+    for block_dict in block_dicts:
+        name = block_dict['name']
+        data = np.array(block_dict['block_data'])
+        allowed_neighbors = block_dict['allowed_neighbors']
+        # Convert string keys back to tuple
+        allowed_neighbors_tuple = {ast.literal_eval(k): v for k, v in allowed_neighbors.items()}
+        metadata = block_dict.get('metadata', {})
+        weight = block_dict.get('weight', 1.0)
+        block_objects.append(Block(name, data, allowed_neighbors=allowed_neighbors_tuple, metadata=metadata, weight=weight))
+    return block_objects
 
 
 
