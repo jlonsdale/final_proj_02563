@@ -22,7 +22,7 @@ pip install taichi numpy tqdm line_profiler
 
 ## How to run
 
-Run files from ./demo to produce scenes
-Screenshots saved to ./screenshot
+- Run files from ./demo to produce scenes
+- Take screenshots with 'P', screenshots are saved to ./screenshot
 
 
